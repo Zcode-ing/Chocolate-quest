@@ -5,9 +5,12 @@ export interface ScoreInput {
   question: GameQuestion;
   responseSeconds: number;
   streak: number;
+  wrongStreak: number;
   playerSkill: number;
   boss: boolean;
   correct: boolean;
+  skipped: boolean;
+  timedOut: boolean;
   shieldArmed: boolean;
 }
 
@@ -25,13 +28,18 @@ export function scoreAnswer(input: ScoreInput): ScoreResult {
     question,
     responseSeconds,
     streak,
+    wrongStreak,
     playerSkill,
     boss,
     correct,
+    skipped,
+    timedOut,
     shieldArmed,
   } = input;
 
-  const base = 56 + question.difficulty * 1.18;
+  const base =
+    GAME_CONFIG.scoreBasePoints +
+    question.difficulty * GAME_CONFIG.scoreDifficultyStep;
   const speedRatio = clamp(
     responseSeconds / Math.max(1, question.estimatedSeconds),
     0,
@@ -39,20 +47,20 @@ export function scoreAnswer(input: ScoreInput): ScoreResult {
   );
   const speedMultiplier =
     speedRatio <= GAME_CONFIG.fastAnswerRatio
-      ? 1.28
+      ? GAME_CONFIG.quickAnswerMultiplier
       : speedRatio <= GAME_CONFIG.slowAnswerRatio
-        ? 1
-        : 0.82;
+        ? GAME_CONFIG.steadyAnswerMultiplier
+        : GAME_CONFIG.slowAnswerMultiplier;
   const streakMultiplier = Math.min(
     GAME_CONFIG.maxStreakMultiplier,
     1 + Math.max(0, streak) * GAME_CONFIG.streakMultiplierStep,
   );
   const challengeMultiplier = clamp(
-    1.18 - Math.abs(question.difficulty - playerSkill) / 90,
+    1.12 - Math.abs(question.difficulty - playerSkill) / 100,
     0.82,
-    1.18,
+    1.12,
   );
-  const bossMultiplier = boss ? 1.55 : 1;
+  const bossMultiplier = boss ? 1.45 : 1;
 
   if (correct) {
     const points = Math.round(
@@ -66,31 +74,50 @@ export function scoreAnswer(input: ScoreInput): ScoreResult {
       points,
       label:
         speedRatio <= GAME_CONFIG.fastAnswerRatio
-          ? "Lightning"
+          ? "Quick and correct"
           : streak >= 2
-            ? "On a streak"
+            ? "Knowledge streak"
             : "Correct",
       shieldConsumed: false,
     };
   }
 
-  if (shieldArmed) {
-    return { points: 0, label: "Shield saved you", shieldConsumed: true };
+  if (skipped) {
+    const penalty = Math.max(
+      1,
+      Math.round(base * GAME_CONFIG.skipPenaltyMultiplier),
+    );
+    return {
+      points: -penalty,
+      label: "Passed with a small penalty",
+      shieldConsumed: false,
+    };
   }
 
-  const penalty = Math.min(
-    boss ? 90 : 62,
-    Math.max(18, Math.round(base * (boss ? 0.36 : 0.27))),
+  if (shieldArmed) {
+    return {
+      points: 0,
+      label: "Safety net absorbed the hit",
+      shieldConsumed: true,
+    };
+  }
+
+  const escalation = Math.min(
+    1 + Math.max(0, wrongStreak) * GAME_CONFIG.wrongStreakPenaltyStep,
+    GAME_CONFIG.maxWrongStreakPenaltyMultiplier,
   );
+  const severity = timedOut
+    ? GAME_CONFIG.timeoutPenaltyMultiplier
+    : GAME_CONFIG.wrongPenaltyMultiplier;
+  const roundRisk = boss ? GAME_CONFIG.bossWrongPenaltyMultiplier : 1;
+  const penalty = Math.max(1, Math.round(base * severity * roundRisk * escalation));
   return {
     points: -penalty,
-    label: boss ? "Boss hit" : "Keep going",
+    label: timedOut ? "No answer before time ran out" : "Incorrect answer",
     shieldConsumed: false,
   };
 }
 
 export function applyScoreBoundary(score: number): number {
-  return GAME_CONFIG.allowNegativeScore
-    ? Math.max(GAME_CONFIG.negativeScoreFloor, score)
-    : Math.max(0, score);
+  return Number.isFinite(score) ? Math.round(score) : 0;
 }

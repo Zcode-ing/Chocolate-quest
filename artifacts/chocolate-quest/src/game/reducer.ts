@@ -17,7 +17,7 @@ import type {
 
 type Action =
   | { type: "SHOW_LEVELS" }
-  | { type: "SET_LEVEL"; level: AcademicLevel; seed: number }
+  | { type: "SET_LEVEL"; level: AcademicLevel; seed: number; runId: string }
   | { type: "START_ROUND"; now: number }
   | { type: "ANSWER"; optionId: string; now: number }
   | { type: "SKIP"; now: number }
@@ -41,6 +41,7 @@ const emptyStats = {
 function createInitialState(): GameState {
   return {
     phase: "intro",
+    runId: null,
     level: null,
     currentQuestion: null,
     questionNumber: 0,
@@ -72,11 +73,13 @@ function createReadyState(
   previous: GameState,
   level: AcademicLevel,
   seed: number,
+  runId: string,
 ): GameState {
   const skillState = createInitialSkill(LEVEL_CONFIG[level].initialSkill);
   return {
     ...createInitialState(),
     phase: "ready",
+    runId,
     level,
     skill: skillState.estimatedSkill,
     skillState,
@@ -171,6 +174,7 @@ function resolveAnswer(
   selectedOptionId: string | null,
   now: number,
   timedOut = false,
+  skipped = false,
 ): GameState {
   const question = state.currentQuestion;
   if (!question || !state.roundKind || !state.questionStartedAt) return state;
@@ -181,18 +185,18 @@ function resolveAnswer(
     question,
     responseSeconds,
     streak: state.streak,
+    wrongStreak: state.skillState.wrongStreak,
     playerSkill: state.skillState.estimatedSkill,
     boss,
     correct,
+    skipped,
+    timedOut,
     shieldArmed: state.abilities.shieldArmed,
   });
   const nextStreak = correct ? state.streak + 1 : 0;
-  const skillState = updateSkill(
-    state.skillState,
-    question,
-    correct,
-    responseSeconds,
-  );
+  const skillState = skipped
+    ? recordSkip(state.skillState)
+    : updateSkill(state.skillState, question, correct, responseSeconds);
   const feedback: AnswerFeedback = {
     correct,
     points: score.points,
@@ -210,20 +214,25 @@ function resolveAnswer(
     topic: question.topic,
     difficulty: question.difficulty,
     correct,
-    skipped: false,
+    skipped,
     responseSeconds,
     boss,
   };
   const answered = state.stats.answered + 1;
+  const timedAnswersBefore = state.stats.answered - state.stats.skipped;
+  const timedAnswersAfter = timedAnswersBefore + (skipped ? 0 : 1);
   const stats = {
     ...state.stats,
     answered,
     correct: state.stats.correct + (correct ? 1 : 0),
     wrong: state.stats.wrong + (correct ? 0 : 1),
+    skipped: state.stats.skipped + (skipped ? 1 : 0),
     bestStreak: Math.max(state.stats.bestStreak, nextStreak),
-    averageSeconds:
-      state.stats.averageSeconds +
-      (responseSeconds - state.stats.averageSeconds) / answered,
+    averageSeconds: skipped
+      ? state.stats.averageSeconds
+      : state.stats.averageSeconds +
+        (responseSeconds - state.stats.averageSeconds) /
+          Math.max(1, timedAnswersAfter),
     bossCorrect: state.stats.bossCorrect + (boss && correct ? 1 : 0),
     bossWrong: state.stats.bossWrong + (boss && !correct ? 1 : 0),
   };

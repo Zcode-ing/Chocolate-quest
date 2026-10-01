@@ -104,6 +104,7 @@ export interface AnswerRecord {
 
 export interface GameState {
   phase: GamePhase;
+  runId: string | null;
   level: AcademicLevel | null;
   currentQuestion: GameQuestion | null;
   questionNumber: number;

@@ -29,6 +29,21 @@ function nextRandom(seed: number): { value: number; seed: number } {
   return { value: nextSeed / 0x1_0000_0000, seed: nextSeed || 0x6d2b79f5 };
 }
 
+function shuffleOptions(
+  question: GameQuestion,
+  seed: number,
+): SelectionResult {
+  const options = [...question.options];
+  let nextSeed = seed;
+  for (let index = options.length - 1; index > 0; index -= 1) {
+    const random = nextRandom(nextSeed);
+    nextSeed = random.seed;
+    const swapIndex = Math.floor(random.value * (index + 1));
+    [options[index], options[swapIndex]] = [options[swapIndex], options[index]];
+  }
+  return { question: { ...question, options }, seed: nextSeed };
+}
+
 function makeUniqueByPrompt(
   questions: GameQuestion[],
   targetDifficulty: number,
@@ -75,14 +90,18 @@ function chooseWeighted(
   const totalWeight = weighted.reduce((sum, item) => sum + item.weight, 0);
   const random = nextRandom(seed);
   let cursor = random.value * totalWeight;
+  let selected: GameQuestion | undefined;
   for (const item of weighted) {
     cursor -= item.weight;
-    if (cursor <= 0) return { question: item.question, seed: random.seed };
+    if (cursor <= 0) {
+      selected = item.question;
+      break;
+    }
   }
-  return {
-    question: weighted[weighted.length - 1].question,
-    seed: random.seed,
-  };
+  return shuffleOptions(
+    selected ?? weighted[weighted.length - 1].question,
+    random.seed,
+  );
 }
 
 export function selectNextQuestion(input: {
