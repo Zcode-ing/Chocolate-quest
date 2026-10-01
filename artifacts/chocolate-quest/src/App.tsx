@@ -220,7 +220,9 @@ function App() {
               <aside className="tool-column">
                 <div className="skill-card">
                   <div className="skill-title"><span>YOUR SKILL</span><Sparkles size={15} /></div>
-                  <div className="skill-score">{state.skill}<small> / 100</small></div>
+                  <div className="skill-score" aria-label={`Skill rating ${Math.round(state.skill)} out of 100`}>
+                    {Math.round(state.skill)}<small> / 100</small>
+                  </div>
                   <div className="skill-meter"><span style={{ transform: `scaleX(${Math.max(0, Math.min(1, state.skill / 100))})` }} /></div>
                   <p>Keep your rhythm. Build that streak.</p>
                 </div>
