@@ -1,0 +1,1620 @@
+# CHOCOLATE QUEST
+
+## A polished, time-based, adaptive knowledge arcade game
+
+You are not being asked to merely redesign an old browser quiz.
+
+You are rebuilding an existing quiz project into a polished, highly responsive, arcade-style knowledge game called **Chocolate Quest**.
+
+The game will be used in a **CBSE school exhibition**, where visitors from different age groups should be able to walk up, understand the interface almost instantly, choose an appropriate academic difficulty level, play for a limited amount of time, and leave feeling that they interacted with a real game rather than a classroom quiz website.
+
+The winner receives a chocolate, which is the reason for the name **Chocolate Quest**.
+
+The experience should feel:
+
+* premium
+* playful but not childish
+* minimalistic
+* highly polished
+* fast
+* responsive
+* visually satisfying
+* easy to understand without instructions
+* suitable for a large exhibition display
+* interesting enough that someone watching another player also wants to try it
+
+Do NOT interpret "100× better" as "add more gradients, shadows, cards, or random animations."
+
+The improvement should come from **game design, state design, interaction design, adaptive difficulty, feedback, animation choreography, and visual polish.**
+
+---
+
+# 1. EXISTING PROJECT — TREAT IT AS LEGACY MATERIAL
+
+The existing project contains:
+
+* `index.html`
+* `styles.css`
+* `script.js`
+* `javascript backup.txt`
+* `easy.txt`
+* `medium.txt`
+* `mixed.txt`
+* `extreme.txt`
+* associated image/video assets
+
+The old game is called Chocolate Quest.
+
+It currently contains question banks at different difficulty levels and uses a short timed quiz format with randomized questions, score tracking, restart functionality, and a victory video for a perfect result.
+
+The existing question banks should be treated as **legacy content to import**, not discarded.
+
+First inspect the complete project and understand:
+
+1. Existing question structures
+2. Existing question-bank separation
+3. Existing answer format
+4. Existing timer behavior
+5. Existing score behavior
+6. Existing randomization logic
+7. Existing celebration behavior
+8. Existing media assets
+9. Duplicate questions
+10. Potentially ambiguous or low-quality questions
+11. Existing bugs and brittle assumptions
+
+Do not silently destroy or rewrite the old question banks.
+
+Create an internal normalized question schema so the legacy data can be imported safely.
+
+For example:
+
+```ts
+type Question = {
+  id: string
+  prompt: string
+  gradeBand: "junior" | "semiSenior" | "senior" | "btech"
+  topic: string
+  difficulty: number          // 0-100
+  estimatedTime: number       // seconds
+  type: QuestionType
+  options?: Option[]
+  correctAnswer: unknown
+  explanation?: string
+  tags?: string[]
+  bossEligible?: boolean
+  sourceBank?: string
+}
+```
+
+The original question wording should remain available after import.
+
+If the imported legacy data contains duplicate, malformed, contradictory, or questionable questions, do not silently alter them. Flag them in development diagnostics so they can be reviewed later.
+
+---
+
+# 2. CORE GAME IDEA
+
+Chocolate Quest is primarily a **time-based score-maximization game**.
+
+The central question is:
+
+> "How many points can this player earn from the question bank before time runs out?"
+
+This should be the core identity of the game.
+
+The player should NOT simply try to complete 5 questions.
+
+Instead:
+
+```text
+START
+  ↓
+Choose academic level
+  ↓
+Short intro
+  ↓
+Timed main round begins
+  ↓
+Answer as many questions as possible
+  ↓
+Correct answers generate points
+  ↓
+Wrong answers remove points
+  ↓
+Skip allows the player to move on
+  ↓
+Difficulty continuously adapts
+  ↓
+TIME EXPIRES
+  ↓
+3-question BOSS ROUND
+  ↓
+Final score calculation
+  ↓
+Winning/result animation
+```
+
+The exact main-round duration must be configurable rather than hard-coded throughout the application.
+
+Create a central configuration object such as:
+
+```ts
+GAME_CONFIG = {
+  mainRoundDuration: 120,
+  bossQuestionDuration: 12,
+  bossQuestionCount: 3,
+  ...
+}
+```
+
+Do not scatter magic numbers across components.
+
+---
+
+# 3. ACADEMIC LEVEL SELECTION
+
+At the beginning, the player must choose:
+
+### JUNIOR
+
+7th–8th class
+
+### SEMI-SENIOR
+
+9th–10th class
+
+### SENIOR
+
+11th–12th class
+
+### ULTRA ADVANCED
+
+B.Tech / advanced technical level
+
+Do not make these look like boring school dropdown options.
+
+Make them feel like four **game difficulty worlds**.
+
+For example:
+
+```text
+JUNIOR
+7–8
+Curious Explorer
+
+SEMI-SENIOR
+9–10
+Knowledge Runner
+
+SENIOR
+11–12
+Challenge Mode
+
+ULTRA ADVANCED
+B.Tech
+Master Architect
+```
+
+The descriptive labels may be refined during the design phase.
+
+The academic level affects:
+
+* available question pool
+* expected question complexity
+* allowed mechanics
+* difficulty range
+* base score values
+* boss difficulty
+* question selection behavior
+
+Do not make Junior simply "easy questions" and B.Tech simply "extreme questions".
+
+Each level should have its own calibrated experience.
+
+---
+
+# 4. THE LIVING DIFFICULTY SYSTEM
+
+This is one of the most important parts of the application.
+
+Do NOT implement difficulty as:
+
+```js
+if (correct) nextDifficulty++
+if (wrong) nextDifficulty--
+```
+
+That is too primitive.
+
+The system needs to maintain an evolving estimate of the player's current performance.
+
+Create a **Player Skill State**.
+
+Example:
+
+```ts
+type PlayerSkillState = {
+  estimatedSkill: number
+  recentAccuracy: number
+  recentSpeed: number
+  currentStreak: number
+  wrongStreak: number
+  skippedCount: number
+  questionsAnswered: number
+  averageResponseTime: number
+  confidenceTrend: number
+}
+```
+
+Each question should also have an internal difficulty score from 0–100.
+
+For example:
+
+```text
+Junior beginner        ~15–35
+Junior advanced        ~35–45
+Semi-senior            ~35–55
+Senior                 ~50–70
+B.Tech                 ~65–100
+```
+
+These numbers are examples, not rigid requirements.
+
+---
+
+# 5. DIFFICULTY SHOULD RESPOND TO THE PLAYER
+
+After every answer, update the player's internal skill estimate.
+
+Consider:
+
+* correctness
+* time taken
+* question difficulty
+* current streak
+* recent answers
+* repeated mistakes
+* repeated fast correct answers
+* skips
+* question type performance
+
+The next question should be chosen based on the relationship between:
+
+```text
+PLAYER SKILL
+       +
+QUESTION DIFFICULTY
+       +
+QUESTION VALUE
+       +
+RECENT PERFORMANCE
+       +
+QUESTION VARIETY
+```
+
+The player should usually receive questions near their current challenge zone.
+
+Do not make every question harder after a correct answer.
+
+Do not make every question easier after a wrong answer.
+
+Instead, use a smooth adaptive curve.
+
+The goal is for the player to feel:
+
+> "This game somehow knows when I'm doing well."
+
+without ever feeling:
+
+> "The game is cheating."
+
+---
+
+# 6. QUESTION SELECTION ENGINE
+
+Create a dedicated `QuestionSelectionEngine`.
+
+It must consider:
+
+* academic level
+* player skill
+* question difficulty
+* previous questions shown
+* previous question topics
+* previous question types
+* recent correctness
+* current streak
+* estimated response time
+* boss eligibility
+* duplicate prevention
+
+Avoid repeatedly showing:
+
+* the same topic
+* the same mechanic
+* almost identical questions
+* questions the player has just answered
+
+Use weighted selection rather than deterministic selection.
+
+However, randomness must NEVER override obvious suitability.
+
+The game should feel unpredictable but intelligent.
+
+---
+
+# 7. THE INTERNAL "QUESTION VALUE" SYSTEM
+
+Every correct answer should have an imaginary internal value.
+
+Call it something like:
+
+**Question Value Index (QVI)**
+
+This is not simply:
+
+```text
+Easy = 1 point
+Medium = 2 points
+Hard = 3 points
+```
+
+Instead, calculate the value using:
+
+### A. Base difficulty value
+
+Harder questions naturally have greater potential value.
+
+### B. Time efficiency
+
+A correct answer given quickly should generally be worth more than the same answer given slowly.
+
+### C. Adaptive challenge bonus
+
+A question that is meaningfully challenging relative to the player's current estimated skill should have slightly greater value.
+
+### D. Streak bonus
+
+A player who is answering consecutive questions correctly can gradually build a multiplier.
+
+### E. Anti-exploit normalization
+
+A player must not be able to farm very easy questions indefinitely for high scores.
+
+---
+
+# 8. EXAMPLE SCORING MODEL
+
+Implement this as a central scoring engine rather than scattered arithmetic.
+
+A starting model could be conceptually similar to:
+
+```text
+baseValue
+× difficultyMultiplier
+× speedMultiplier
+× streakMultiplier
+× challengeAlignmentMultiplier
+```
+
+For example:
+
+```text
+speedMultiplier:
+fast answer      → high
+medium answer    → normal
+slow answer      → reduced
+```
+
+Do not make the exact formula visually obvious to the player.
+
+The UI should communicate the result elegantly:
+
+```text
++184
+PERFECT
+```
+
+or
+
+```text
++96
+GOOD SPEED
+```
+
+rather than displaying mathematical internals.
+
+The exact numerical curve should be centralized in one scoring module and easy to tune later.
+
+---
+
+# 9. WRONG ANSWERS
+
+Wrong answers must produce **negative points**.
+
+The penalty should depend on question value/difficulty but should be carefully capped so the game does not become frustrating.
+
+A wrong answer should feel meaningful:
+
+```text
+-72
+```
+
+rather than simply:
+
+```text
+Wrong.
+```
+
+Use animated score feedback.
+
+Do not create huge punishment spikes that make one mistake destroy an entire run.
+
+The score may go below zero during the run if the design calls for it, but clamp behavior must be deliberate and configurable.
+
+---
+
+# 10. SKIP BUTTON
+
+There must be a clearly visible **SKIP** button.
+
+Skipping should:
+
+* immediately move to another suitable question
+* not count as a correct answer
+* not award points
+* naturally cost time because the player spent time deciding
+* be recorded by the difficulty engine
+* prevent exploitation through unlimited repeated skipping
+
+Do not punish skipping with an arbitrary huge score penalty.
+
+The time itself is the main cost.
+
+Optionally introduce a very small transition cooldown so players cannot machine-gun the skip button.
+
+---
+
+# 11. LIVES / SHIELDS / ABILITIES
+
+Include a lightweight ability system.
+
+Do not let abilities overpower the actual knowledge game.
+
+Use a small number of meaningful abilities.
+
+Suggested default:
+
+### SHIELD
+
+Negates the negative-score effect of one wrong answer.
+
+### 50/50
+
+Removes two incorrect options on an eligible multiple-choice question.
+
+### TIME BURST
+
+Adds a small amount of time to the main timer.
+
+Each should have limited availability.
+
+For example:
+
+```text
+🛡 1
+✦ 1
+⏱ 1
+```
+
+The player should understand what each ability does instantly.
+
+The abilities should feel like part of a game rather than buttons copied from a mobile game.
+
+Do not add energy currencies, microtransactions, loot boxes, or other unnecessary systems.
+
+---
+
+# 12. DIFFERENT QUESTION MECHANICS
+
+The architecture must support multiple question types.
+
+At minimum support an extensible system for:
+
+1. Multiple choice
+2. True / false
+3. Sequence / ordering
+4. Match / pair
+5. Code or output prediction
+6. "Find the incorrect statement"
+7. Optional short-answer/input questions if practical
+
+The rendering system should use a common interface such as:
+
+```ts
+<QuestionRenderer />
+```
+
+with different renderer components:
+
+```text
+MultipleChoiceRenderer
+TrueFalseRenderer
+SequenceRenderer
+MatchRenderer
+CodeRenderer
+...
+```
+
+Do NOT hard-code every question type directly into the main game component.
+
+Legacy questions can initially remain MCQ.
+
+New mechanics should be introduced using the new schema.
+
+For Junior users, use simpler interaction mechanics.
+
+For Senior and B.Tech users, progressively introduce more reasoning-oriented mechanics.
+
+---
+
+# 13. BOSS ROUND
+
+The Boss Round is a major event.
+
+It must contain **exactly 3 questions**.
+
+The main timer stops when the main round ends.
+
+Then the interface should visually transition into a distinct boss state.
+
+Example:
+
+```text
+──────────────
+   BOSS ROUND
+──────────────
+
+3 QUESTIONS
+NO SECOND CHANCES
+```
+
+Do not literally use a cartoon monster unless it fits the final art direction.
+
+The "boss" can instead be represented through:
+
+* darker visual treatment
+* stronger typography
+* subtle lighting
+* special sound cue
+* stronger animation
+* unique background treatment
+* higher score stakes
+
+The three questions should be selected from the difficult end of the player's available academic level.
+
+However, they should still be calibrated against the player's actual performance.
+
+Do not simply give Junior players B.Tech questions.
+
+Boss questions should feel difficult **for that player**.
+
+Each boss question can use a different mechanic.
+
+For example:
+
+```text
+Boss Q1 → difficult MCQ
+Boss Q2 → reasoning/code question
+Boss Q3 → final challenge
+```
+
+Give boss answers significantly higher value than standard questions.
+
+Wrong answers should have stronger consequences, but not absurd penalties.
+
+Create a dedicated:
+
+```ts
+BossEngine
+```
+
+rather than mixing boss behavior into the regular game loop.
+
+---
+
+# 14. MAIN GAME HUD
+
+The main HUD should be extremely clean.
+
+Suggested layout:
+
+```text
+┌──────────────────────────────────────────────┐
+│  CHOCOLATE QUEST        SCORE       02:14    │
+│                           1,842              │
+├──────────────────────────────────────────────┤
+│                                              │
+│               QUESTION                       │
+│                                              │
+│          [ Question content ]                │
+│                                              │
+│          [ Answer ]                          │
+│          [ Answer ]                          │
+│          [ Answer ]                          │
+│          [ Answer ]                          │
+│                                              │
+├──────────────────────────────────────────────┤
+│  STREAK ×4      SHIELD  50/50  TIME BURST    │
+│                                      SKIP    │
+└──────────────────────────────────────────────┘
+```
+
+This is only conceptual.
+
+Do not mechanically copy this layout.
+
+The final design should use hierarchy, spacing, typography and motion to make it feel premium.
+
+---
+
+# 15. VISUAL DESIGN DIRECTION
+
+The theme is **CHOCOLATE QUEST**.
+
+Do not make it look like a children's chocolate advertisement.
+
+Use a refined confectionery aesthetic.
+
+Suggested visual language:
+
+* deep cocoa / dark chocolate
+* warm cream
+* subtle caramel/gold highlights
+* restrained red or berry accent if appropriate
+* premium typography
+* soft depth
+* smooth rounded geometry
+* subtle gradients
+* gentle glow
+* restrained glass-like surfaces where useful
+* clean iconography
+
+Avoid:
+
+* excessive neon
+* rainbow gradients
+* giant drop shadows
+* excessive glassmorphism
+* spinning UI everywhere
+* cartoon overload
+* clutter
+* UI that looks like a generic AI-generated dashboard
+
+The final interface should look closer to:
+
+**premium arcade interface + modern confectionery branding**
+
+than:
+
+**school quiz website**
+
+---
+
+# 16. ANIMATION PHILOSOPHY
+
+Animations are extremely important.
+
+But they must be:
+
+**smooth + short + intentional**
+
+not noisy.
+
+Prefer:
+
+* 180–450 ms transitions for most interactions
+* subtle spring motion
+* fade/scale
+* controlled slide transitions
+* score number transitions
+* soft particles
+* subtle glow changes
+* timer pulse only when appropriate
+
+The game should never feel sluggish.
+
+Do not animate every element simultaneously.
+
+Animation hierarchy should be:
+
+```text
+PLAYER ACTION
+      ↓
+IMMEDIATE RESPONSE
+      ↓
+SCORE FEEDBACK
+      ↓
+QUESTION TRANSITION
+```
+
+Use CSS transforms/opacity where possible for performance.
+
+Avoid expensive continuous animations that can make the exhibition machine stutter.
+
+---
+
+# 17. INTRO ANIMATION
+
+Create a polished introduction.
+
+Sequence idea:
+
+```text
+dark background
+      ↓
+subtle chocolate/cocoa visual appears
+      ↓
+CHOCOLATE QUEST logo fades in
+      ↓
+small chocolate-themed accent animation
+      ↓
+"Choose your challenge."
+      ↓
+level selection
+```
+
+Keep it short.
+
+The player should reach the level-selection screen quickly.
+
+No long cinematic that blocks gameplay.
+
+Provide a skip option after the first few moments if appropriate.
+
+---
+
+# 18. ANSWER FEEDBACK
+
+Correct answer:
+
+* selected answer reacts
+* incorrect options become visually secondary if necessary
+* positive score burst
+* subtle particles
+* score counter animates
+* streak indicator updates
+* next question transitions smoothly
+
+Wrong answer:
+
+* selected answer reacts clearly
+* negative score animation
+* subtle red/warm feedback
+* correct answer may be revealed depending on game mode
+* next question follows without browser alerts
+
+TIMEOUT:
+
+* different feedback from wrong answer
+* timer visibly reaches zero
+* question closes
+* no confusing reuse of the wrong-answer event
+
+The current legacy project uses browser `alert()` for these events. Remove this completely from the new experience.
+
+---
+
+# 19. SCORE ANIMATION
+
+The score should feel alive.
+
+Examples:
+
+```text
++184
+```
+
+appears near the question/result region and travels subtly toward the score HUD.
+
+Streak:
+
+```text
+×4
+```
+
+should have its own micro-animation.
+
+Large milestones can trigger larger but still controlled responses.
+
+Do not make the screen explode into effects after every answer.
+
+Reserve major effects for:
+
+* streak milestones
+* boss entry
+* exceptional answers
+* final victory
+
+---
+
+# 20. TIMER DESIGN
+
+The timer is one of the core mechanics.
+
+Do not merely display:
+
+```text
+120
+```
+
+Create a visual timer.
+
+Possible options:
+
+* circular progress
+* horizontal progress bar
+* segmented timeline
+* numeric countdown combined with a subtle progress indicator
+
+The timer should change intensity gradually as time becomes low.
+
+Do not make the timer stressful too early.
+
+Example:
+
+```text
+normal
+↓
+low time
+↓
+critical
+```
+
+At the final few seconds, subtle pulse or heartbeat-like feedback may occur.
+
+Respect reduced-motion preferences.
+
+---
+
+# 21. WINNING / RESULT EXPERIENCE
+
+The result screen must feel like an actual game ending.
+
+Display:
+
+```text
+QUEST COMPLETE
+```
+
+Then:
+
+```text
+FINAL SCORE
+2,846
+```
+
+Also show useful stats:
+
+```text
+Questions answered
+Correct
+Wrong
+Skipped
+Best streak
+Average answer time
+Boss performance
+```
+
+Then provide a strong result classification based on performance.
+
+Avoid insulting language for low scores.
+
+The winner is getting chocolate, so a strong performance can culminate in a tasteful chocolate-themed reward animation.
+
+Possible sequence:
+
+```text
+score locks in
+      ↓
+background darkens slightly
+      ↓
+score rises/settles
+      ↓
+particles/glow
+      ↓
+chocolate reward visual
+      ↓
+"CHOCOLATE QUEST COMPLETE"
+```
+
+A victory animation can be significantly more elaborate than normal answer animations.
+
+---
+
+# 22. DO NOT RELY ON A SINGLE VIDEO FILE
+
+The old game used a full-screen victory video.
+
+Keep support for video if useful, but do not make the application depend on it.
+
+The victory sequence must still work when:
+
+* the video is missing
+* autoplay is blocked
+* audio is unavailable
+* the browser refuses playback
+
+The core victory experience should be implemented with HTML/CSS/SVG/JS animation.
+
+Media assets should enhance the experience, not be a single point of failure.
+
+---
+
+# 23. SOUND DESIGN
+
+Support optional sound effects.
+
+At minimum:
+
+* button interaction
+* correct
+* wrong
+* skip
+* streak
+* boss entry
+* boss answer
+* timer warning
+* final result
+* victory
+
+Audio must start safely according to browser autoplay rules.
+
+The entire game should remain fully usable with sound disabled.
+
+Include a visible sound toggle.
+
+For an exhibition environment, remember that sound may need to be muted.
+
+---
+
+# 24. RESPONSIVENESS
+
+The game must work on:
+
+* large exhibition monitor
+* normal desktop monitor
+* laptop
+* 16:9 display
+* smaller browser window
+
+Do not use the old fixed 500px layout.
+
+Do not use brittle absolute positioning for the entire interface.
+
+Use:
+
+* responsive containers
+* CSS Grid/Flexbox
+* fluid spacing
+* max-width constraints
+* scalable typography
+
+The exhibition display should be the primary visual target.
+
+---
+
+# 25. KEYBOARD SUPPORT
+
+Implement keyboard navigation.
+
+Examples:
+
+```text
+1 / 2 / 3 / 4 → choose answer
+S → skip
+H → relevant ability/hint where appropriate
+Esc → pause/settings if allowed
+```
+
+Do not require keyboard use, but keyboard support should feel natural.
+
+Buttons must remain accessible with mouse/touch.
+
+---
+
+# 26. ACCESSIBILITY
+
+Include:
+
+* readable contrast
+* visible focus states
+* keyboard navigation
+* reduced motion mode
+* sound toggle
+* no color-only communication
+* sensible font sizes
+* no tiny buttons
+
+Do not sacrifice aesthetics for accessibility or accessibility for aesthetics.
+
+Both should coexist.
+
+---
+
+# 27. GAME STATE ARCHITECTURE
+
+Use an explicit state machine or equivalent centralized state architecture.
+
+Conceptually:
+
+```text
+INTRO
+ ↓
+LEVEL_SELECT
+ ↓
+READY
+ ↓
+MAIN_GAME
+ ↓
+QUESTION_FEEDBACK
+ ↓
+MAIN_GAME
+ ↓
+TIME_UP
+ ↓
+BOSS_INTRO
+ ↓
+BOSS_GAME
+ ↓
+RESULT
+ ↓
+RESTART / HOME
+```
+
+Do not allow random components to independently mutate unrelated global variables.
+
+The entire game state should be understandable from one centralized model.
+
+Example:
+
+```ts
+GameState {
+  phase
+  academicLevel
+  currentQuestion
+  questionIndex
+  remainingTime
+  score
+  streak
+  playerSkill
+  abilities
+  answeredQuestions
+  skippedQuestions
+  bossState
+}
+```
+
+---
+
+# 28. ENGINE SEPARATION
+
+Separate the system into logical modules.
+
+Suggested structure:
+
+```text
+/src
+
+  /game
+    GameController
+    GameState
+    GameConfig
+    ScoreEngine
+    DifficultyEngine
+    QuestionSelectionEngine
+    BossEngine
+    AbilityEngine
+
+  /questions
+    questionSchema
+    questionLoader
+    questionRegistry
+    questionValidation
+
+  /components
+    Intro
+    LevelSelector
+    GameHUD
+    QuestionCard
+    AnswerRenderer
+    Timer
+    ScoreDisplay
+    StreakDisplay
+    AbilityBar
+    SkipButton
+    BossIntro
+    BossQuestion
+    ResultScreen
+
+  /animations
+    transitions
+    scoreEffects
+    victoryEffects
+    bossEffects
+
+  /audio
+    audioManager
+
+  /data
+    imported legacy banks
+    configuration
+
+  /utils
+```
+
+The exact folder structure can improve during the architecture phase.
+
+The principle is more important than the exact names.
+
+---
+
+# 29. TECHNOLOGY
+
+Use a maintainable modern browser stack.
+
+Preferred direction:
+
+* React
+* TypeScript
+* Vite
+* modern CSS
+* component-based architecture
+* a lightweight motion solution where useful
+* SVG/CSS for custom visual effects
+* localStorage for local settings/session persistence
+* no unnecessary backend
+
+Do not introduce a backend merely because one is available.
+
+This is primarily an exhibition game.
+
+Reliability matters more than infrastructure complexity.
+
+The game should be capable of running locally if needed.
+
+---
+
+# 30. DATA ARCHITECTURE
+
+Do not hard-code question arrays directly inside visual components.
+
+Question data should be externalized.
+
+The game engine should not care whether a question came from:
+
+```text
+easy.txt
+medium.txt
+mixed.txt
+extreme.txt
+future JSON
+```
+
+Everything should ultimately become the normalized internal question model.
+
+Build a validation tool that can detect:
+
+* duplicate IDs
+* duplicate questions
+* missing answers
+* incorrect option counts
+* malformed entries
+* missing difficulty metadata
+* impossible configurations
+* duplicate answer choices
+* unsupported question types
+
+---
+
+# 31. ACADEMIC CONTENT MAPPING
+
+Map legacy content into the new four-level structure carefully.
+
+Do not blindly assume that filename = perfect difficulty.
+
+For example:
+
+```text
+Legacy Easy → candidate Junior pool
+Legacy Medium → candidate Semi-Senior/Senior pool
+Legacy Extreme → candidate B.Tech pool
+Legacy Mixed → content classification required
+```
+
+Use the existing data as evidence rather than pretending it is already perfectly calibrated.
+
+The system should make question difficulty an explicit property.
+
+---
+
+# 32. FAIRNESS AND ANTI-EXPLOIT DESIGN
+
+The game must prevent obvious score exploits.
+
+Examples:
+
+* repeating easy questions
+* skipping forever
+* double-clicking answers
+* pressing two answers almost simultaneously
+* triggering answer callbacks twice
+* timer race conditions
+* score being awarded twice
+* abilities being activated twice
+* going backward into already answered questions
+* boss questions accidentally being counted twice
+
+Every question should have a single-resolution state:
+
+```text
+UNANSWERED
+ANSWERING
+RESOLVED
+```
+
+Once resolved, additional clicks must do nothing.
+
+---
+
+# 33. PERFORMANCE
+
+The game should feel extremely smooth.
+
+Target:
+
+* no unnecessary re-renders
+* no layout thrashing
+* animation primarily using transform/opacity
+* no giant continuously updating DOM tree
+* lazy-load optional heavy assets
+* gracefully handle missing assets
+* no memory leaks
+* no orphaned timers
+
+The old implementation uses interval-based timers and dynamically creates answer buttons. Rebuild this so timer lifecycle is controlled centrally and cleaned up correctly.
+
+---
+
+# 34. PAUSE / RESET / RECOVERY
+
+The game should never become permanently stuck.
+
+Include safe handling for:
+
+* browser resize
+* tab switching
+* refresh during a game
+* accidental duplicate clicks
+* missing media
+* interrupted audio
+* unexpected question data
+* timer cleanup
+
+A refresh can safely return the user to the home screen unless a deliberate resume feature is implemented.
+
+Do not add complexity merely for theoretical edge cases.
+
+---
+
+# 35. EXHIBITION-FIRST EXPERIENCE
+
+This will be used by people who may have never seen the game before.
+
+A person should understand the main interaction within approximately 5 seconds.
+
+The UI should communicate:
+
+```text
+WHAT DO I DO?
+HOW MUCH TIME DO I HAVE?
+HOW MANY POINTS DO I HAVE?
+WHAT SHOULD I PRESS?
+```
+
+without requiring a tutorial paragraph.
+
+Use tiny hints/microcopy where helpful.
+
+---
+
+# 36. RESTART EXPERIENCE
+
+Restarting should feel instant.
+
+After result:
+
+```text
+PLAY AGAIN
+```
+
+should return smoothly to a ready state.
+
+Also provide:
+
+```text
+CHANGE LEVEL
+```
+
+without forcing the player through unnecessary screens.
+
+---
+
+# 37. ARCHITECTURE BEFORE CODE
+
+IMPORTANT:
+
+Before implementing the full application, inspect the existing codebase and prepare a concise architecture proposal.
+
+Show:
+
+1. Current architecture
+2. Problems in current architecture
+3. Proposed architecture
+4. State machine
+5. Question schema
+6. Difficulty engine
+7. Score engine
+8. Boss engine
+9. UI component structure
+10. Migration strategy from legacy question files
+11. Testing strategy
+12. Performance strategy
+
+Do not immediately overwrite the old project.
+
+Create a checkpoint before major architectural changes.
+
+Then implement incrementally.
+
+---
+
+# 38. IMPLEMENTATION ORDER
+
+Use this order:
+
+### Stage 1
+
+Analyze and import the existing data.
+
+### Stage 2
+
+Create normalized question model.
+
+### Stage 3
+
+Create game-state architecture.
+
+### Stage 4
+
+Implement main timed gameplay.
+
+### Stage 5
+
+Implement scoring engine.
+
+### Stage 6
+
+Implement living difficulty engine.
+
+### Stage 7
+
+Implement skip and abilities.
+
+### Stage 8
+
+Implement multiple question mechanics.
+
+### Stage 9
+
+Implement boss round.
+
+### Stage 10
+
+Implement result/winning sequence.
+
+### Stage 11
+
+Implement animation/audio polish.
+
+### Stage 12
+
+Accessibility, keyboard controls, performance and bug fixing.
+
+### Stage 13
+
+Exhibition-mode polish and final testing.
+
+Do not try to implement everything in one giant untested file.
+
+---
+
+# 39. TESTING REQUIREMENTS
+
+Create automated tests for the important game logic.
+
+At minimum test:
+
+### Score engine
+
+* correct answer
+* wrong answer
+* fast correct
+* slow correct
+* streak
+* difficulty multiplier
+* boss score
+* negative score
+* score boundaries
+
+### Difficulty engine
+
+* repeated correct answers
+* repeated wrong answers
+* fast correct answers
+* slow correct answers
+* mixed performance
+* skips
+* difficulty transitions
+
+### Question engine
+
+* duplicate prevention
+* level filtering
+* difficulty suitability
+* topic balancing
+* question-type balancing
+
+### Timer
+
+* timer starts
+* timer stops
+* timer resets
+* timeout occurs exactly once
+* no duplicate interval
+* boss timer independent from main timer
+
+### Abilities
+
+* each ability only usable when available
+* no double activation
+* shield consumed correctly
+* time bonus applied exactly once
+* 50/50 does not reveal the answer
+
+### Boss
+
+* exactly 3 questions
+* no duplicate boss questions
+* correct score accounting
+* clean transition into and out of boss mode
+
+---
+
+# 40. VISUAL POLISH CHECKLIST
+
+Before considering the project complete, inspect it as a designer, not only as a programmer.
+
+Ask:
+
+* Does it look expensive or cheap?
+* Does the UI feel intentional?
+* Is anything visually unnecessary?
+* Are animations too slow?
+* Are animations too frequent?
+* Does the score feel rewarding?
+* Does a wrong answer feel clear without feeling annoying?
+* Does the boss round actually feel different?
+* Does the game look good on a large monitor?
+* Does the level-selection screen immediately communicate difficulty?
+* Does the chocolate theme feel integrated rather than pasted on?
+* Would a person standing nearby understand what is happening?
+* Would someone watching want to play?
+
+---
+
+# 41. IMPORTANT DESIGN PRINCIPLE
+
+Do not confuse complexity with quality.
+
+The game can remain technically understandable while still feeling sophisticated.
+
+The sophistication should come from:
+
+```text
+adaptive difficulty
++
+smart scoring
++
+excellent feedback
++
+clean transitions
++
+strong visual hierarchy
++
+question variety
++
+boss climax
+```
+
+not from 100 unnecessary features.
+
+---
+
+# 42. FINAL EXPERIENCE TARGET
+
+The intended emotional progression is:
+
+```text
+"Oh, that's clean."
+        ↓
+"Let's try this."
+        ↓
+"Okay, I'm getting points."
+        ↓
+"Wait... it's getting harder."
+        ↓
+"I need to choose whether to answer or skip."
+        ↓
+"I'm on a streak!"
+        ↓
+"THE BOSS ROUND?"
+        ↓
+"COME ON..."
+        ↓
+"YES!"
+        ↓
+"Chocolate Quest Complete."
+```
+
+The final result should feel like a **small polished arcade game built around knowledge**, not a traditional school quiz.
+
+---
+
+# 43. VERY IMPORTANT: DO NOT GUESS THROUGH ARCHITECTURAL AMBIGUITIES
+
+Before making decisions that materially affect the game design, ask me concise clarification questions.
+
+Do not ask dozens of questions.
+
+If an issue is minor, choose the most sensible implementation and continue.
+
+If an issue affects the core scoring, timing, progression, or exhibition experience, surface the decision first.
+
+When proposing something important, explain the trade-off briefly.
+
+For example:
+
+> "Should the main round be 60 seconds or 120 seconds? 60 creates a rapid arcade feel; 120 gives players more time to experience the adaptive system."
+
+Do not silently make major design decisions.
+
+---
+
+# 44. MOST IMPORTANT INSTRUCTION
+
+Do not turn this into generic AI-generated "quiz app" design.
+
+The application should have a **distinct identity**.
+
+It should feel like one coherent game called:
+
+# CHOCOLATE QUEST
+
+Every screen should feel like it belongs to the same world.
+
+The player should remember the experience, not merely the questions.
+
+Start by analyzing the existing project and proposing the architecture.
+Do not begin by replacing the entire codebase blindly.

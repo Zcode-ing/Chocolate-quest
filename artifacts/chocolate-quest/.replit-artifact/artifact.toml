@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Chocolate Quest"
+description = "A polished, local-first adaptive knowledge arcade game for a CBSE school exhibition. Visitors choose an academic level, play a 60-second score-maximizing round, and face a three-question boss finale."
+version = "1.0.0"
+id = "artifacts/chocolate-quest"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25460
+
+[services.development]
+run = "pnpm --filter @workspace/chocolate-quest run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/chocolate-quest", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/chocolate-quest/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25460"
+BASE_PATH = "/"
