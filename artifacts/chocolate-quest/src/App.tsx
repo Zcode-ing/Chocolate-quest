@@ -5,10 +5,14 @@ import {
   Shield, Sparkles, X, Zap,
 } from 'lucide-react';
 import { useGameController } from '@/game/useGameController';
+import { playSoundEnabledChime } from '@/game/sound';
 import { GAME_CONFIG } from '@/game/config';
-import { useCocoaLoyalty } from '@/game/cocoaLoyalty';
+import { getCocoaStanding } from '@/game/cocoaLoyalty';
+import { useCocoaPlayers } from '@/game/cocoaPlayers';
+import { PLAYABLE_QUESTIONS, QUESTION_IMPORT_DIAGNOSTICS, QUESTION_POOL_COUNTS } from '@/questions/questionData';
 import { GameHeader } from '@/components/GameHeader';
 import { AnswerOption } from '@/components/AnswerOption';
+import { PreGameGate } from '@/components/PreGameGate';
 
 type LevelId = 'junior' | 'semi-senior' | 'senior' | 'ultra-advanced';
 type AbilityId = 'shield' | 'fiftyFifty' | 'timeBurst';
@@ -24,14 +28,37 @@ const LEVELS: LevelInfo[] = [
 function App() {
   const game = useGameController();
   const { state } = game;
-  const loyalty = useCocoaLoyalty(state.phase, state.runId, state.answerHistory);
-  const [soundOn, setSoundOn] = useState(false);
+  const loyalty = useCocoaPlayers(
+    state.phase,
+    state.runId,
+    state.level,
+    state.answerHistory,
+    state.skillState.estimatedSkill,
+  );
   const [showIntro, setShowIntro] = useState(false);
+  const [showPlayerGate, setShowPlayerGate] = useState(false);
 
   const flipSound = useCallback(() => {
-    setSoundOn((current) => !current);
+    if (!state.soundEnabled) playSoundEnabledChime();
     game.toggleSound();
-  }, [game]);
+  }, [game.toggleSound, state.soundEnabled]);
+
+  const selectPlayer = useCallback((username: string) => {
+    if (!loyalty.selectPlayer(username)) return;
+    setShowPlayerGate(false);
+    setShowIntro(false);
+    game.showLevelSelect();
+  }, [game.showLevelSelect, loyalty.selectPlayer]);
+
+  const exitPlayerGate = useCallback(() => {
+    setShowPlayerGate(false);
+    setShowIntro(true);
+  }, []);
+
+  const playAgain = useCallback(() => {
+    if (state.level) game.playAgain(loyalty.difficultyFor(state.level));
+    else game.playAgain();
+  }, [game.playAgain, loyalty.difficultyFor, state.level]);
 
   const chooseAnswer = useCallback((optionId: string) => {
     if (state.phase === 'main' || state.phase === 'boss') game.answer(optionId);
@@ -62,11 +89,13 @@ function App() {
        if ((event.key.toLowerCase() === 's' || event.key === 'Escape') && state.phase === 'main') {
         skipQuestion();
       }
-      if (event.key === 'Enter' && state.phase === 'level-select' && state.level) game.startRun(state.level as LevelId);
+       if (event.key === 'Enter' && state.phase === 'level-select' && state.level) {
+         game.startRun(state.level as LevelId, loyalty.difficultyFor(state.level));
+       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [chooseAnswer, continueRound, game, skipQuestion, state.abilities.eliminatedOptionIds, state.currentQuestion, state.level, state.phase]);
+  }, [chooseAnswer, continueRound, game, loyalty.difficultyFor, skipQuestion, state.abilities.eliminatedOptionIds, state.currentQuestion, state.level, state.phase]);
 
   const selectedLevel = LEVELS.find((level) => level.id === state.level);
   const isPlay = state.phase === 'main' || state.phase === 'boss' || state.phase === 'feedback';
@@ -77,12 +106,32 @@ function App() {
     ? GAME_CONFIG.bossQuestionDurationMs
     : GAME_CONFIG.mainRoundDurationMs;
   const activeBossQuestion = Math.max(1, Math.min(3, state.bossQuestionNumber || 1));
+  const resultBeans = loyalty.activePlayer
+    ? loyalty.activePlayer.beans +
+      (loyalty.activePlayer.lastRunId === state.runId
+        ? 0
+        : loyalty.runProgress.beansEarned)
+    : 0;
+  const resultStanding = loyalty.activePlayer ? getCocoaStanding(resultBeans) : null;
 
   return (
     <main className="game-frame flex min-h-[100dvh] flex-col">
-      <GameHeader soundOn={soundOn} onToggleSound={flipSound} />
+      <GameHeader soundOn={state.soundEnabled} onToggleSound={flipSound} />
       <div className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-5 pb-8 sm:px-8 lg:px-12">
-        {(state.phase === 'intro' || showIntro) && (
+        {showPlayerGate && (
+          <PreGameGate
+            players={loyalty.players}
+            onSelectPlayer={selectPlayer}
+            onExit={exitPlayerGate}
+            onDifficultyChange={loyalty.setPlayerDifficulty}
+            questionCounts={QUESTION_POOL_COUNTS}
+            totalQuestions={PLAYABLE_QUESTIONS.length}
+            importedQuestionCount={QUESTION_IMPORT_DIAGNOSTICS.importedCount}
+            soundEnabled={state.soundEnabled}
+          />
+        )}
+
+        {!showPlayerGate && (state.phase === 'intro' || showIntro) && (
           <section className="intro-layout enter-up mx-auto grid w-full max-w-6xl flex-1 items-center gap-9 py-9 lg:grid-cols-[1fr_.83fr] lg:gap-20">
             <div className="relative z-10 py-5">
               <div className="eyebrow"><span className="eyebrow-dot" /> CBSE EXHIBITION • KNOWLEDGE ARCADE</div>
@@ -90,10 +139,10 @@ function App() {
                 Think fast.<br /><span className="text-[#a97030]">Taste</span> victory.
               </h1>
               <p className="mt-7 max-w-[460px] text-lg leading-7 text-[#705c4b] sm:text-xl">
-                A minute on the clock. A little knowledge goes a long way. Then meet the three-question boss.
+                Computers, software, hardware, and the ideas behind them. One minute on the clock, then meet the three-question boss.
               </p>
-              <button type="button" data-testid="button-start-quest" onClick={() => { setShowIntro(false); game.changeLevel(); }} className="primary-button mt-9">
-                Choose your level <ArrowRight size={18} strokeWidth={2.2} />
+              <button type="button" data-testid="button-start-quest" onClick={() => { setShowIntro(false); setShowPlayerGate(true); }} className="primary-button mt-9">
+                Choose your player <ArrowRight size={18} strokeWidth={2.2} />
               </button>
               <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-semibold uppercase tracking-[.14em] text-[#8a7662]">
                 <span className="inline-flex items-center gap-2"><Clock3 size={14} /> 60 seconds</span>
@@ -118,20 +167,33 @@ function App() {
           </section>
         )}
 
-        {state.phase === 'level-select' && !showIntro && (
+        {state.phase === 'level-select' && !showIntro && !showPlayerGate && (
           <section className="enter-up mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center py-10">
             <button type="button" data-testid="button-back-intro" className="back-link mb-9 w-fit" onClick={() => setShowIntro(true)}>
               <ArrowLeft size={16} /> Back to the beginning
             </button>
             <div className="eyebrow"><span className="eyebrow-dot" /> PICK YOUR PLAYING FIELD</div>
             <h1 className="display-serif mt-4 text-5xl tracking-[-.04em] sm:text-7xl">How sharp are<br className="sm:hidden" /> we feeling?</h1>
-            <p className="mt-4 max-w-xl text-base leading-7 text-[#705c4b]">Choose the level that feels right. Your round will be tuned just for you.</p>
+            <p className="mt-4 max-w-xl text-base leading-7 text-[#705c4b]">
+              Playing as <strong className="text-[#38241b]">{loyalty.activePlayer?.username}</strong>. Choose a level; your saved skill will tune its difficulty.
+            </p>
+            <button
+              type="button"
+              data-testid="button-switch-player"
+              className="back-link mt-4 w-fit"
+              onClick={() => {
+                loyalty.leavePlayer();
+                setShowPlayerGate(true);
+              }}
+            >
+              Switch player
+            </button>
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
               {LEVELS.map((level) => {
                 const active = state.level === level.id;
                 return (
                   <button type="button" key={level.id} data-testid={`button-level-${level.id}`} aria-pressed={active}
-                    onClick={() => game.startRun(level.id)}
+                    onClick={() => game.startRun(level.id, loyalty.difficultyFor(level.id))}
                     className={`level-choice ${active ? 'is-selected' : ''}`}>
                     <span className="level-mark mono">{level.mark}</span>
                     <span className="level-copy"><strong>{level.title}</strong><span>{level.classes} · {level.note}</span></span>
@@ -283,7 +345,7 @@ function App() {
                   <ResultStat label="Average answer" value={`${state.stats.averageSeconds.toFixed(1)}s`} icon={<Clock3 size={17} />} />
                 </div>
               </div>
-              <section className="cocoa-result" aria-labelledby="cocoa-result-title" data-testid="panel-cocoa-result">
+              {loyalty.activePlayer && resultStanding && <section className="cocoa-result" aria-labelledby="cocoa-result-title" data-testid="panel-cocoa-result">
                 <div className="cocoa-result-emblem"><Award size={21} /></div>
                 <div className="cocoa-result-copy">
                   <p className="cocoa-overline">YOUR COCOA LOYALTY</p>
@@ -294,22 +356,22 @@ function App() {
                   </h2>
                   <p>
                     {loyalty.runProgress.eligible
-                      ? `A ${Math.round(loyalty.runProgress.accuracy * 100)}% run earns beans. Keep going toward ${loyalty.standing.nextRank?.name ?? 'the top rank'}.`
+                     ? `A ${Math.round(loyalty.runProgress.accuracy * 100)}% run earns beans. Keep going toward ${resultStanding.nextRank?.name ?? 'the top rank'}.`
                       : `${loyalty.runProgress.attempts < 6 ? `${Math.max(0, 6 - loyalty.runProgress.attempts)} more decisions` : 'Reach 70% accuracy'} to qualify next run. Every run counts as practice.`}
                   </p>
                 </div>
                 <div className="cocoa-result-total">
-                  <strong>{loyalty.profile.beans}</strong>
+                   <strong>{resultBeans}</strong>
                   <span>BEANS BANKED</span>
                 </div>
                 <div className="cocoa-result-progress">
-                  <div><span>{loyalty.standing.rank.name}</span><span>{loyalty.standing.nextRank ? `${loyalty.standing.beansToNext} to ${loyalty.standing.nextRank.name}` : 'Highest rank'}</span></div>
-                  <div className="cocoa-meter"><i style={{ transform: `scaleX(${loyalty.standing.progress})` }} /></div>
+                   <div><span>{resultStanding.rank.name}</span><span>{resultStanding.nextRank ? `${resultStanding.beansToNext} to ${resultStanding.nextRank.name}` : 'Highest rank'}</span></div>
+                   <div className="cocoa-meter"><i style={{ transform: `scaleX(${resultStanding.progress})` }} /></div>
                 </div>
                 <p className="cocoa-footnote">Saved in this browser only. Beans are for fun; there is no real-world redemption.</p>
-              </section>
+              </section>}
               <div className="result-actions">
-                <button type="button" data-testid="button-play-again" onClick={game.playAgain} className="primary-button"><RotateCcw size={17} /> Play again</button>
+                <button type="button" data-testid="button-play-again" onClick={playAgain} className="primary-button"><RotateCcw size={17} /> Play again</button>
                 <button type="button" data-testid="button-result-change-level" onClick={game.changeLevel} className="secondary-button">Choose another level <ArrowRight size={16} /></button>
               </div>
               <div className="result-footer">CHOCOLATE QUEST <span>·</span> CBSE EXHIBITION ARCADE <span>·</span> NICELY DONE</div>
@@ -335,15 +397,17 @@ function ResultStat({ label, value, icon }: { label: string; value: string; icon
 }
 
 function CocoaEntryCard({ loyalty, compact = false }: {
-  loyalty: ReturnType<typeof useCocoaLoyalty>;
+  loyalty: ReturnType<typeof useCocoaPlayers>;
   compact?: boolean;
 }) {
-  const { profile, standing } = loyalty;
+  const profile = loyalty.activePlayer;
+  const standing = loyalty.standing;
+  if (!profile || !standing) return null;
   return (
     <aside className={`cocoa-entry ${compact ? 'cocoa-entry-compact' : ''}`} aria-label="Cocoa loyalty progress" data-testid="panel-cocoa-entry">
       <div className="cocoa-entry-mark"><Award size={17} /></div>
       <div className="cocoa-entry-body">
-        <div className="cocoa-entry-heading"><span>COCOA LOYALTY</span><b>{standing.rank.name}</b></div>
+        <div className="cocoa-entry-heading"><span>{profile.username.toUpperCase()} · COCOA LOYALTY</span><b>{standing.rank.name}</b></div>
         <div className="cocoa-entry-stats">
           <strong>{profile.beans}<small> beans</small></strong>
           <span>{profile.completedRuns} {profile.completedRuns === 1 ? 'run' : 'runs'} played</span>

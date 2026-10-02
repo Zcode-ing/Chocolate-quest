@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useReducer } from "react";
 import { GAME_CONFIG } from "./config";
 import { createInitialState, gameReducer } from "./reducer";
+import {
+  playAnswerSound,
+  playSkipSound,
+  playStartSound,
+  playTimeoutSound,
+} from "./sound";
 import type {
   AbilityId,
   AcademicLevel,
@@ -9,27 +15,6 @@ import type {
 
 function createRunId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-}
-
-function playAnswerTone(correct: boolean): void {
-  if (typeof window === "undefined" || !("AudioContext" in window)) return;
-  try {
-    const audio = new AudioContext();
-    const oscillator = audio.createOscillator();
-    const gain = audio.createGain();
-    oscillator.type = "sine";
-    oscillator.frequency.value = correct ? 660 : 245;
-    gain.gain.setValueAtTime(0.0001, audio.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.07, audio.currentTime + 0.018);
-    gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.16);
-    oscillator.connect(gain);
-    gain.connect(audio.destination);
-    oscillator.start();
-    oscillator.stop(audio.currentTime + 0.17);
-    oscillator.onended = () => void audio.close();
-  } catch {
-    // Sound is optional; browser audio restrictions must not interrupt play.
-  }
 }
 
 export function useGameController(): GameController {
@@ -43,46 +28,48 @@ export function useGameController(): GameController {
     dispatch({ type: "SHOW_LEVELS" });
   }, []);
 
-  const startRun = useCallback((level: AcademicLevel) => {
+  const startRun = useCallback((level: AcademicLevel, startingSkill?: number) => {
     dispatch({
       type: "SET_LEVEL",
       level,
       seed: Math.floor(Math.random() * 0xffff_ffff) || 0x43a2_1f57,
       runId: createRunId(),
+      startingSkill,
     });
   }, []);
 
   const startRound = useCallback(() => {
     dispatch({ type: "START_ROUND", now: Date.now() });
-  }, []);
+    if (state.soundEnabled) playStartSound();
+  }, [state.soundEnabled]);
 
   const answer = useCallback(
     (optionId: string) => {
       const correct =
         state.currentQuestion?.correctOptionId === optionId;
       dispatch({ type: "ANSWER", optionId, now: Date.now() });
-      if (state.soundEnabled && correct !== undefined) {
-        playAnswerTone(correct);
-      }
+      if (state.soundEnabled) playAnswerSound(correct);
     },
     [state.currentQuestion, state.soundEnabled],
   );
 
   const skip = useCallback(() => {
     dispatch({ type: "SKIP", now: Date.now() });
-  }, []);
+    if (state.soundEnabled) playSkipSound();
+  }, [state.soundEnabled]);
 
   const useAbility = useCallback((ability: AbilityId) => {
     dispatch({ type: "USE_ABILITY", ability, now: Date.now() });
   }, []);
 
-  const playAgain = useCallback(() => {
+  const playAgain = useCallback((startingSkill?: number) => {
     if (state.level) {
       dispatch({
         type: "SET_LEVEL",
         level: state.level,
         seed: Math.floor(Math.random() * 0xffff_ffff) || 0x43a2_1f57,
         runId: createRunId(),
+        startingSkill,
       });
     } else {
       dispatch({ type: "SHOW_LEVELS" });
@@ -104,6 +91,16 @@ export function useGameController(): GameController {
     }, 100);
     return () => window.clearInterval(timer);
   }, [state.phase, state.roundKind]);
+
+  useEffect(() => {
+    if (
+      state.phase === "feedback" &&
+      state.soundEnabled &&
+      state.feedback?.timedOut
+    ) {
+      playTimeoutSound();
+    }
+  }, [state.phase, state.soundEnabled, state.feedback]);
 
   useEffect(() => {
     if (state.phase !== "feedback") return;

@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: developer
+    description: Developer access operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /developer/verify:
+    post:
+      operationId: verifyDeveloperAccess
+      tags: [developer]
+      summary: Verify the local developer access code
+      description: Checks a developer access code without returning or storing it in the client.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeveloperAccessInput"
+      responses:
+        "200":
+          description: Whether the code was accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeveloperAccessResult"
+        "400":
+          description: The submitted request is invalid
+        "429":
+          description: Too many failed attempts
+        "503":
+          description: Developer access has not been configured
 components:
   schemas:
     HealthStatus:
@@ -33,4 +60,20 @@ components:
           type: string
       required:
         - status
+    DeveloperAccessInput:
+      type: object
+      properties:
+        accessCode:
+          type: string
+          minLength: 8
+          maxLength: 128
+      required:
+        - accessCode
+    DeveloperAccessResult:
+      type: object
+      properties:
+        verified:
+          type: boolean
+      required:
+        - verified
 

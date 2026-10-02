@@ -17,7 +17,13 @@ import type {
 
 type Action =
   | { type: "SHOW_LEVELS" }
-  | { type: "SET_LEVEL"; level: AcademicLevel; seed: number; runId: string }
+  | {
+      type: "SET_LEVEL";
+      level: AcademicLevel;
+      seed: number;
+      runId: string;
+      startingSkill?: number;
+    }
   | { type: "START_ROUND"; now: number }
   | { type: "ANSWER"; optionId: string; now: number }
   | { type: "SKIP"; now: number }
@@ -74,8 +80,12 @@ function createReadyState(
   level: AcademicLevel,
   seed: number,
   runId: string,
+  startingSkill?: number,
 ): GameState {
-  const skillState = createInitialSkill(LEVEL_CONFIG[level].initialSkill);
+  const initialSkill = Number.isFinite(startingSkill)
+    ? Math.min(100, Math.max(0, Math.round(startingSkill as number)))
+    : LEVEL_CONFIG[level].initialSkill;
+  const skillState = createInitialSkill(initialSkill);
   return {
     ...createInitialState(),
     phase: "ready",
@@ -311,10 +321,8 @@ function startMainRound(state: GameState, now: number): GameState {
     score: 0,
     streak: 0,
     bestStreak: 0,
-    skillState: createInitialSkill(
-      state.level ? LEVEL_CONFIG[state.level].initialSkill : 0,
-    ),
-    skill: state.level ? LEVEL_CONFIG[state.level].initialSkill : 0,
+    skillState: createInitialSkill(state.skillState.estimatedSkill),
+    skill: state.skillState.estimatedSkill,
     abilities: { ...INITIAL_ABILITIES, eliminatedOptionIds: [] },
     stats: { ...emptyStats },
     bossQuestions: [],
@@ -441,7 +449,13 @@ export function gameReducer(
         timerDeadline: null,
       };
     case "SET_LEVEL":
-      return createReadyState(state, action.level, action.seed, action.runId);
+      return createReadyState(
+        state,
+        action.level,
+        action.seed,
+        action.runId,
+        action.startingSkill,
+      );
     case "START_ROUND":
       if (state.phase === "ready") return startMainRound(state, action.now);
       if (state.phase === "boss-intro") return startBoss(state, action.now);

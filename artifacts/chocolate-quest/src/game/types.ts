@@ -134,12 +134,12 @@ export interface GameState {
 export interface GameController {
   state: GameState;
   showLevelSelect: () => void;
-  startRun: (level: AcademicLevel) => void;
+  startRun: (level: AcademicLevel, startingSkill?: number) => void;
   startRound: () => void;
   answer: (optionId: string) => void;
   skip: () => void;
   useAbility: (ability: AbilityId) => void;
-  playAgain: () => void;
+  playAgain: (startingSkill?: number) => void;
   changeLevel: () => void;
   toggleSound: () => void;
 }
