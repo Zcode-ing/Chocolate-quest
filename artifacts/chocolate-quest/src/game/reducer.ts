@@ -218,14 +218,13 @@ function resolveAnswer(
     responseSeconds,
     boss,
   };
-  const answered = state.stats.answered + 1;
-  const timedAnswersBefore = state.stats.answered - state.stats.skipped;
-  const timedAnswersAfter = timedAnswersBefore + (skipped ? 0 : 1);
+  const answered = state.stats.answered + (skipped ? 0 : 1);
+  const timedAnswersAfter = state.stats.answered + (skipped ? 0 : 1);
   const stats = {
     ...state.stats,
     answered,
     correct: state.stats.correct + (correct ? 1 : 0),
-    wrong: state.stats.wrong + (correct ? 0 : 1),
+    wrong: state.stats.wrong + (correct || skipped ? 0 : 1),
     skipped: state.stats.skipped + (skipped ? 1 : 0),
     bestStreak: Math.max(state.stats.bestStreak, nextStreak),
     averageSeconds: skipped
@@ -234,7 +233,7 @@ function resolveAnswer(
         (responseSeconds - state.stats.averageSeconds) /
           Math.max(1, timedAnswersAfter),
     bossCorrect: state.stats.bossCorrect + (boss && correct ? 1 : 0),
-    bossWrong: state.stats.bossWrong + (boss && !correct ? 1 : 0),
+    bossWrong: state.stats.bossWrong + (boss && !correct && !skipped ? 1 : 0),
   };
   return {
     ...state,
@@ -442,7 +441,7 @@ export function gameReducer(
         timerDeadline: null,
       };
     case "SET_LEVEL":
-      return createReadyState(state, action.level, action.seed);
+      return createReadyState(state, action.level, action.seed, action.runId);
     case "START_ROUND":
       if (state.phase === "ready") return startMainRound(state, action.now);
       if (state.phase === "boss-intro") return startBoss(state, action.now);
@@ -453,6 +452,7 @@ export function gameReducer(
     case "ANSWER":
       if (
         (state.phase !== "main" && state.phase !== "boss") ||
+        (state.phase === "main" && action.now < state.inputLockedUntil) ||
         !state.currentQuestion ||
         state.abilities.eliminatedOptionIds.includes(action.optionId) ||
         !state.currentQuestion.options.some(
@@ -464,18 +464,12 @@ export function gameReducer(
       return resolveAnswer(state, action.optionId, action.now);
     case "SKIP": {
       if (state.phase === "boss" && state.currentQuestion) {
-        const skipped = resolveAnswer(state, null, action.now);
+        const skipped = resolveAnswer(state, null, action.now, false, true);
         return {
           ...skipped,
           feedback: skipped.feedback
-            ? { ...skipped.feedback, label: "Boss question skipped" }
+            ? { ...skipped.feedback, label: "Boss question passed" }
             : null,
-          stats: { ...skipped.stats, skipped: skipped.stats.skipped + 1 },
-          answerHistory: skipped.answerHistory.map((record, index) =>
-            index === skipped.answerHistory.length - 1
-              ? { ...record, skipped: true }
-              : record,
-          ),
         };
       }
       if (
@@ -485,29 +479,12 @@ export function gameReducer(
       ) {
         return state;
       }
-      const responseSeconds = Math.max(
-        0,
-        (action.now - (state.questionStartedAt ?? action.now)) / 1000,
-      );
-      const skippedRecord: AnswerRecord = {
-        questionId: state.currentQuestion.id,
-        promptKey: normalizePrompt(state.currentQuestion.prompt),
-        topic: state.currentQuestion.topic,
-        difficulty: state.currentQuestion.difficulty,
-        correct: false,
-        skipped: true,
-        responseSeconds,
-        boss: false,
-      };
+      const skipped = resolveAnswer(state, null, action.now, false, true);
       return {
         ...pickMainQuestion(
           {
-            ...state,
+            ...skipped,
             phase: "main",
-            skillState: recordSkip(state.skillState),
-            streak: 0,
-            stats: { ...state.stats, skipped: state.stats.skipped + 1 },
-            answerHistory: [...state.answerHistory, skippedRecord],
             questionNumber: state.questionNumber + 1,
             inputLockedUntil: action.now + GAME_CONFIG.skipCooldownMs,
           },

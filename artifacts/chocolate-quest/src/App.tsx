@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
-  ArrowDownRight, ArrowLeft, ArrowRight, AudioLines, Bolt, Check, ChevronRight,
+  ArrowDownRight, ArrowLeft, ArrowRight, AudioLines, Award, Bolt, Check, ChevronRight,
   Clock3, Crown, Flame, Keyboard, Lightbulb, LockKeyhole, Play, RotateCcw,
   Shield, Sparkles, X, Zap,
 } from 'lucide-react';
 import { useGameController } from '@/game/useGameController';
 import { GAME_CONFIG } from '@/game/config';
+import { useCocoaLoyalty } from '@/game/cocoaLoyalty';
 import { GameHeader } from '@/components/GameHeader';
 import { AnswerOption } from '@/components/AnswerOption';
 
@@ -23,6 +24,7 @@ const LEVELS: LevelInfo[] = [
 function App() {
   const game = useGameController();
   const { state } = game;
+  const loyalty = useCocoaLoyalty(state.phase, state.runId, state.answerHistory);
   const [soundOn, setSoundOn] = useState(false);
   const [showIntro, setShowIntro] = useState(false);
 
@@ -98,6 +100,7 @@ function App() {
                 <span className="inline-flex items-center gap-2"><Crown size={14} /> 3-question boss</span>
                 <span className="inline-flex items-center gap-2"><Keyboard size={14} /> Keys 1–4</span>
               </div>
+              <CocoaEntryCard loyalty={loyalty} />
             </div>
             <div className="hero-art relative mx-auto flex min-h-[330px] w-full max-w-[530px] items-center justify-center lg:min-h-[500px]">
               <div className="hero-orbit orbit-one" /><div className="hero-orbit orbit-two" />
@@ -138,6 +141,7 @@ function App() {
               })}
             </div>
             <div className="mt-7 flex items-center gap-2 text-sm text-[#826e5a]"><LockKeyhole size={14} /> Just for fun. No grades, no pressure.</div>
+            <CocoaEntryCard loyalty={loyalty} compact />
           </section>
         )}
 
@@ -179,11 +183,17 @@ function App() {
                   {question?.topic && <span className="topic-tag">{question.topic}</span>}
                   {question?.type && <span className="type-tag">{question.type}</span>}
                 </div>
-                <div className="question-card">
+                <div
+                  key={`${state.roundKind ?? 'run'}-${question?.id ?? 'loading'}-${isBoss ? activeBossQuestion : state.questionNumber}`}
+                  className="question-card"
+                >
                   {state.phase === 'feedback' && state.feedback && (
                     <div className={`feedback-ribbon ${state.feedback.correct ? 'feedback-good' : 'feedback-miss'}`} role="status" data-testid="status-answer-feedback">
                       <span className="feedback-symbol">{state.feedback.correct ? <Check size={16} /> : <X size={16} />}</span>
-                      <span><b>{state.feedback.label || (state.feedback.correct ? 'Well played!' : 'Not quite')}</b>{state.feedback.correct && state.feedback.points ? ` · +${state.feedback.points} points` : ''}</span>
+                      <span>
+                        <b>{state.feedback.label || (state.feedback.correct ? 'Well played!' : 'Not quite')}</b>
+                        {` · ${state.feedback.points === 0 ? '0' : `${state.feedback.correct ? '+' : '−'}${Math.abs(state.feedback.points)}`} points`}
+                      </span>
                     </div>
                   )}
                   <div className="question-ornament">Q<span>·</span></div>
@@ -192,7 +202,7 @@ function App() {
                 {question?.options?.length ? (
                   <div className="answer-list" role="group" aria-label="Answer choices">
                     {question.options.map((option, index) => (
-                      <AnswerOption key={option.id} option={option} index={index}
+                      <AnswerOption key={`${question.id}-${option.id}`} option={option} index={index}
                         eliminated={state.abilities.eliminatedOptionIds.includes(option.id)}
                         disabled={state.phase === 'feedback'}
                         feedback={state.phase === 'feedback' && state.feedback
@@ -269,9 +279,35 @@ function App() {
                   <ResultStat label="Correct answers" value={`${state.stats.correct}`} icon={<Check size={17} />} />
                   <ResultStat label="Best streak" value={`${state.stats.bestStreak}`} icon={<Flame size={17} />} />
                   <ResultStat label="Boss answers" value={`${state.stats.bossCorrect} / 3`} icon={<Crown size={17} />} />
+                  <ResultStat label="Run accuracy" value={`${Math.round(loyalty.runProgress.accuracy * 100)}%`} icon={<Check size={17} />} />
                   <ResultStat label="Average answer" value={`${state.stats.averageSeconds.toFixed(1)}s`} icon={<Clock3 size={17} />} />
                 </div>
               </div>
+              <section className="cocoa-result" aria-labelledby="cocoa-result-title" data-testid="panel-cocoa-result">
+                <div className="cocoa-result-emblem"><Award size={21} /></div>
+                <div className="cocoa-result-copy">
+                  <p className="cocoa-overline">YOUR COCOA LOYALTY</p>
+                  <h2 id="cocoa-result-title" className="cocoa-result-title">
+                    {loyalty.runProgress.eligible
+                      ? `+${loyalty.runProgress.beansEarned} Cocoa Beans`
+                      : 'A little more practice, a lot more cocoa'}
+                  </h2>
+                  <p>
+                    {loyalty.runProgress.eligible
+                      ? `A ${Math.round(loyalty.runProgress.accuracy * 100)}% run earns beans. Keep going toward ${loyalty.standing.nextRank?.name ?? 'the top rank'}.`
+                      : `${loyalty.runProgress.attempts < 6 ? `${Math.max(0, 6 - loyalty.runProgress.attempts)} more decisions` : 'Reach 70% accuracy'} to qualify next run. Every run counts as practice.`}
+                  </p>
+                </div>
+                <div className="cocoa-result-total">
+                  <strong>{loyalty.profile.beans}</strong>
+                  <span>BEANS BANKED</span>
+                </div>
+                <div className="cocoa-result-progress">
+                  <div><span>{loyalty.standing.rank.name}</span><span>{loyalty.standing.nextRank ? `${loyalty.standing.beansToNext} to ${loyalty.standing.nextRank.name}` : 'Highest rank'}</span></div>
+                  <div className="cocoa-meter"><i style={{ transform: `scaleX(${loyalty.standing.progress})` }} /></div>
+                </div>
+                <p className="cocoa-footnote">Saved in this browser only. Beans are for fun; there is no real-world redemption.</p>
+              </section>
               <div className="result-actions">
                 <button type="button" data-testid="button-play-again" onClick={game.playAgain} className="primary-button"><RotateCcw size={17} /> Play again</button>
                 <button type="button" data-testid="button-result-change-level" onClick={game.changeLevel} className="secondary-button">Choose another level <ArrowRight size={16} /></button>
@@ -296,6 +332,35 @@ function AbilityButton({ id, label, note, count, icon, onUse }: {
 
 function ResultStat({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
   return <div className="result-stat"><span className="result-stat-icon">{icon}</span><span>{label}</span><b>{value}</b></div>;
+}
+
+function CocoaEntryCard({ loyalty, compact = false }: {
+  loyalty: ReturnType<typeof useCocoaLoyalty>;
+  compact?: boolean;
+}) {
+  const { profile, standing } = loyalty;
+  return (
+    <aside className={`cocoa-entry ${compact ? 'cocoa-entry-compact' : ''}`} aria-label="Cocoa loyalty progress" data-testid="panel-cocoa-entry">
+      <div className="cocoa-entry-mark"><Award size={17} /></div>
+      <div className="cocoa-entry-body">
+        <div className="cocoa-entry-heading"><span>COCOA LOYALTY</span><b>{standing.rank.name}</b></div>
+        <div className="cocoa-entry-stats">
+          <strong>{profile.beans}<small> beans</small></strong>
+          <span>{profile.completedRuns} {profile.completedRuns === 1 ? 'run' : 'runs'} played</span>
+          <span>Best accuracy {Math.round(profile.bestAccuracy * 100)}%</span>
+        </div>
+        <div className="cocoa-meter" aria-label={`${Math.round(standing.progress * 100)} percent to next rank`}>
+          <i style={{ transform: `scaleX(${standing.progress})` }} />
+        </div>
+        <p>
+          {standing.nextRank
+            ? `${standing.beansToNext} beans to ${standing.nextRank.name}. Earn beans with 6+ decisions and 70%+ accuracy.`
+            : 'You have reached the highest rank. Keep playing for your own best.'}
+          {' '}Saved on this device; no real-world redemption.
+        </p>
+      </div>
+    </aside>
+  );
 }
 
 export default App;

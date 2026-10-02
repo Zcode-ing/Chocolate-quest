@@ -7,6 +7,10 @@ import type {
   GameController,
 } from "./types";
 
+function createRunId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 function playAnswerTone(correct: boolean): void {
   if (typeof window === "undefined" || !("AudioContext" in window)) return;
   try {
@@ -44,6 +48,7 @@ export function useGameController(): GameController {
       type: "SET_LEVEL",
       level,
       seed: Math.floor(Math.random() * 0xffff_ffff) || 0x43a2_1f57,
+      runId: createRunId(),
     });
   }, []);
 
@@ -77,6 +82,7 @@ export function useGameController(): GameController {
         type: "SET_LEVEL",
         level: state.level,
         seed: Math.floor(Math.random() * 0xffff_ffff) || 0x43a2_1f57,
+        runId: createRunId(),
       });
     } else {
       dispatch({ type: "SHOW_LEVELS" });
