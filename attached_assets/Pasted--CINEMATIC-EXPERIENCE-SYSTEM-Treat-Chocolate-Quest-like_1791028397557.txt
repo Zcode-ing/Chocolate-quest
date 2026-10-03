@@ -1,0 +1,972 @@
+# CINEMATIC EXPERIENCE SYSTEM
+
+## Treat Chocolate Quest like an animated interactive short film
+
+The game must NOT feel like a conventional browser quiz with some animation added on top.
+
+The intended experience is:
+
+> **an interactive animated cinematic game where the quiz mechanics are embedded inside the visual world.**
+
+The player should feel like they have entered a small stylized universe called **Chocolate Quest**.
+
+The interface should continuously communicate motion, atmosphere, anticipation, reaction, and progression.
+
+However, the visual language must remain **minimal, elegant and controlled**.
+
+Do NOT make it look like:
+
+* a casino
+* a mobile gacha game
+* a children's Flash game
+* a generic neon gaming dashboard
+* an AI-generated landing page
+* an overanimated website
+
+The target is:
+
+> **cinematic animation + premium game UI + chocolate/confectionery world + extremely clean interaction design**
+
+---
+
+# 1. THINK IN SCENES, NOT PAGES
+
+The application should conceptually be structured as a sequence of animated scenes.
+
+Instead of:
+
+```text
+Home Page
+Quiz Page
+Result Page
+```
+
+think:
+
+```text
+SCENE 01 — ARRIVAL
+        ↓
+SCENE 02 — CHOOSE YOUR PATH
+        ↓
+SCENE 03 — THE QUEST BEGINS
+        ↓
+SCENE 04 — THE RUN
+        ↓
+SCENE 05 — THE WORLD RESPONDS
+        ↓
+SCENE 06 — TIME COLLAPSES
+        ↓
+SCENE 07 — THE BOSS
+        ↓
+SCENE 08 — FINAL RESULT
+        ↓
+SCENE 09 — CHOCOLATE REWARD
+```
+
+These are not separate traditional web pages.
+
+They should transition into one another seamlessly.
+
+The player should feel like the camera has moved into another part of the same world.
+
+---
+
+# 2. CINEMATIC INTRO
+
+The game should begin almost like a movie opening.
+
+Example visual sequence:
+
+```text
+BLACK
+   ↓
+very subtle ambient sound
+   ↓
+a tiny warm light appears
+   ↓
+chocolate-like surface slowly becomes visible
+   ↓
+camera-like movement through the environment
+   ↓
+CHOCOLATE QUEST appears
+   ↓
+small subtitle:
+"How far can you go?"
+```
+
+Then the interface naturally emerges.
+
+Do not make this a 10-second advertisement.
+
+The entire intro should be short enough for exhibition use.
+
+Target approximately:
+
+```text
+2–5 seconds
+```
+
+depending on animation complexity.
+
+Allow the intro to be skipped.
+
+---
+
+# 3. THE CAMERA SHOULD FEEL ALIVE
+
+The game should create the illusion of a camera even though it is running in the browser.
+
+Use subtle:
+
+* zooms
+* pans
+* depth shifts
+* parallax
+* scale transitions
+* camera easing
+* foreground/background separation
+* controlled motion blur where appropriate
+
+For example:
+
+When a question begins:
+
+```text
+camera settles
+       ↓
+question enters foreground
+       ↓
+answers appear with staggered timing
+```
+
+When the player answers:
+
+```text
+answer selected
+       ↓
+micro camera movement
+       ↓
+visual reaction
+       ↓
+score animation
+       ↓
+camera settles
+       ↓
+next question
+```
+
+The camera movement should NEVER make the game difficult to read.
+
+The visual motion serves the game rather than fighting it.
+
+---
+
+# 4. DEPTH AND PARALLAX
+
+Create multiple visual layers.
+
+Conceptually:
+
+```text
+BACKGROUND
+    ↓
+ATMOSPHERE
+    ↓
+ENVIRONMENT
+    ↓
+GAME UI
+    ↓
+FOREGROUND EFFECTS
+```
+
+The background should move more slowly than the foreground.
+
+This produces cinematic depth without requiring an actual 3D world.
+
+Examples:
+
+* distant cocoa-colored shapes
+* soft floating particles
+* subtle light rays
+* abstract chocolate textures
+* foreground silhouettes
+* caramel-like highlights
+* small atmospheric particles
+
+Keep them extremely subtle.
+
+The player should notice the atmosphere subconsciously rather than consciously thinking:
+
+> "Wow, there are 17 floating particles."
+
+---
+
+# 5. CINEMATIC QUESTION PRESENTATION
+
+A question should not simply pop into the DOM.
+
+When a new question begins:
+
+```text
+previous scene fades
+       ↓
+camera shifts
+       ↓
+question enters
+       ↓
+question text settles
+       ↓
+answers reveal sequentially
+       ↓
+timer becomes active
+```
+
+Answer buttons should have slight staggered entrances.
+
+For example:
+
+```text
+Answer A → 50 ms
+Answer B → 90 ms
+Answer C → 130 ms
+Answer D → 170 ms
+```
+
+Do not reveal them so slowly that gameplay becomes annoying.
+
+The entire entrance should feel almost instantaneous.
+
+---
+
+# 6. THE UI SHOULD FEEL DIEGETIC
+
+Whenever possible, make UI feel like it belongs to the world.
+
+Instead of:
+
+```text
+SCORE: 1842
+```
+
+floating as a generic website label, integrate it into the composition.
+
+Possible examples:
+
+```text
+QUEST SCORE
+1,842
+```
+
+with a subtle visual structure that resembles a game instrument rather than a web dashboard.
+
+Likewise:
+
+```text
+TIME
+01:17
+```
+
+should visually belong to Chocolate Quest.
+
+Avoid excessive panels.
+
+The player should feel like they are looking through a game interface, not operating an admin dashboard.
+
+---
+
+# 7. ANSWER ANIMATIONS SHOULD FEEL LIKE FILM EDITING
+
+### CORRECT ANSWER
+
+Do not simply turn the button green.
+
+Instead:
+
+```text
+selection
+   ↓
+tiny pause
+   ↓
+visual confirmation
+   ↓
+warm light pulse
+   ↓
+score rises
+   ↓
+particles drift outward
+   ↓
+streak updates
+   ↓
+camera transitions
+```
+
+The whole sequence should happen quickly.
+
+### WRONG ANSWER
+
+Do not violently shake everything.
+
+Use:
+
+```text
+selection
+   ↓
+brief visual tension
+   ↓
+subtle impact
+   ↓
+negative score appears
+   ↓
+correct-answer indication
+   ↓
+scene continues
+```
+
+The player should understand the mistake instantly.
+
+### SKIP
+
+Skipping should feel intentional.
+
+For example:
+
+```text
+question dissolves
+       ↓
+small directional transition
+       ↓
+next question arrives
+```
+
+No ugly page reload.
+
+---
+
+# 8. SCORE SHOULD BE A VISUAL EVENT
+
+The score is one of the main characters of the game.
+
+When points are gained:
+
+```text
++184
+```
+
+should animate from the vicinity of the answered question toward the score display.
+
+When points are lost:
+
+```text
+-72
+```
+
+should move in a different direction and visually communicate loss.
+
+Do not freeze the gameplay while displaying these effects.
+
+They should happen while the game continues.
+
+---
+
+# 9. STREAKS SHOULD HAVE CINEMATIC ESCALATION
+
+The longer the player maintains a streak, the more the environment should subtly react.
+
+For example:
+
+```text
+STREAK ×2
+minimal response
+
+STREAK ×4
+slightly stronger glow
+
+STREAK ×6
+environment becomes more energetic
+
+STREAK ×8
+special visual treatment
+
+STREAK ×10
+major moment
+```
+
+Do not make every streak milestone a huge spectacle.
+
+Escalate gradually.
+
+This creates the feeling that the player is "heating up."
+
+---
+
+# 10. LIVING DIFFICULTY SHOULD BE VISUAL TOO
+
+The adaptive difficulty system should influence more than question selection.
+
+As the player performs well:
+
+* transitions may become slightly faster
+* atmosphere may become more intense
+* question presentation may become more dramatic
+* score opportunities become larger
+* difficult questions become more frequent
+
+As the player struggles:
+
+* the visual tempo may settle
+* transitions can become slightly calmer
+* the game should remain encouraging
+* difficulty should adapt subtly
+
+Never explicitly tell the player:
+
+```text
+PLAYER SKILL = 71.43
+```
+
+The system should feel intelligent rather than technical.
+
+---
+
+# 11. TIMER AS A CINEMATIC DEVICE
+
+The timer should become part of the scene.
+
+Early in the round:
+
+```text
+calm
+minimal
+quiet
+```
+
+As time decreases:
+
+```text
+slightly stronger visual tension
+```
+
+Critical state:
+
+```text
+subtle pulse
+stronger timer prominence
+slightly more intense ambience
+```
+
+Very low time:
+
+```text
+cinematic urgency
+```
+
+Do NOT use obnoxious flashing.
+
+The timer should feel like a movie gradually approaching its climax.
+
+---
+
+# 12. MAIN ROUND SHOULD FEEL LIKE A JOURNEY
+
+Do not keep the exact same visual state for the entire timed round.
+
+Introduce subtle progression.
+
+For example:
+
+```text
+EARLY RUN
+calm environment
+       ↓
+PLAYER GAINS MOMENTUM
+environment becomes warmer/brighter
+       ↓
+HIGH STREAK
+more energy
+       ↓
+TIME RUNNING LOW
+stronger tension
+       ↓
+TIME ENDS
+hard visual transition
+```
+
+This makes a 2-minute quiz feel like an actual sequence with a beginning, middle and climax.
+
+---
+
+# 13. TIME-UP SHOULD FEEL LIKE A SCENE CHANGE
+
+Do not simply display:
+
+```text
+Time's Up!
+```
+
+Instead:
+
+```text
+timer reaches zero
+        ↓
+game briefly freezes
+        ↓
+ambient motion stops
+        ↓
+score settles
+        ↓
+screen transitions
+        ↓
+BOSS ROUND begins
+```
+
+This is the cinematic midpoint/climax transition.
+
+---
+
+# 14. BOSS ROUND SHOULD FEEL LIKE ENTERING A DIFFERENT FILM
+
+The Boss Round should be unmistakably different.
+
+Do not just put:
+
+```text
+BOSS ROUND
+Question 1
+```
+
+on the same screen.
+
+Create a short boss-entry sequence.
+
+For example:
+
+```text
+main environment slows
+       ↓
+screen darkens
+       ↓
+camera pulls back
+       ↓
+boss title appears
+       ↓
+distinct audio cue
+       ↓
+three challenge indicators appear
+       ↓
+camera moves forward
+       ↓
+BOSS QUESTION 1
+```
+
+The player should think:
+
+> "Okay. This is different."
+
+---
+
+# 15. THREE BOSS QUESTIONS = THREE ACTS
+
+Treat the three boss questions as:
+
+```text
+ACT I
+Challenge
+
+ACT II
+Escalation
+
+ACT III
+Final decision
+```
+
+The third question should feel like the climax.
+
+Do not necessarily make the third question mathematically harder.
+
+Instead make the presentation more dramatic.
+
+Example:
+
+```text
+BOSS 1
+large challenge
+
+BOSS 2
+unexpected mechanic
+
+BOSS 3
+final high-stakes question
+```
+
+---
+
+# 16. BOSS VISUAL LANGUAGE
+
+Use a separate visual state rather than another card.
+
+Possible visual changes:
+
+* darker cocoa atmosphere
+* tighter composition
+* stronger contrast
+* focused lighting
+* slower camera
+* sharper typography
+* restrained particles
+* special border treatment
+* distinct boss soundtrack
+
+Avoid giant monster graphics unless the final art direction specifically calls for one.
+
+The boss can be an **atmospheric event** rather than a literal character.
+
+---
+
+# 17. THE FINAL QUESTION SHOULD HAVE A CLIMAX
+
+After the player answers Boss Question 3:
+
+Do not immediately jump to the result page.
+
+Use a short resolution sequence:
+
+```text
+answer locks
+       ↓
+everything becomes quiet
+       ↓
+score calculates
+       ↓
+score counter rapidly resolves
+       ↓
+screen holds
+       ↓
+final result appears
+```
+
+This pause is important.
+
+It lets the player actually experience the conclusion.
+
+---
+
+# 18. RESULT SCREEN SHOULD BE CINEMATIC
+
+The final score should not simply be printed in a card.
+
+Example sequence:
+
+```text
+background slowly settles
+
+QUEST COMPLETE
+
+small pause
+
+FINAL SCORE
+
+score begins counting upward
+
+1,284
+1,960
+2,410
+2,746
+2,846
+```
+
+Then:
+
+```text
+PERFORMANCE SUMMARY
+```
+
+appears.
+
+Statistics should enter sequentially rather than all at once.
+
+---
+
+# 19. CHOCOLATE REWARD MOMENT
+
+The physical chocolate prize is part of the identity.
+
+Use it.
+
+After a sufficiently successful run, create a tasteful chocolate-themed reward reveal.
+
+Conceptually:
+
+```text
+result completes
+      ↓
+screen transitions
+      ↓
+warm light
+      ↓
+Chocolate Quest emblem
+      ↓
+stylized chocolate reward animation
+      ↓
+"CLAIM YOUR CHOCOLATE"
+```
+
+The game itself should NOT pretend to dispense the physical chocolate.
+
+The interface simply communicates:
+
+> **You earned it.**
+
+This creates a satisfying bridge between the digital game and the physical exhibition reward.
+
+---
+
+# 20. WINNING ANIMATION
+
+For exceptional performance, use a completely different visual intensity level.
+
+Normal answer:
+
+```text
+small response
+```
+
+Streak:
+
+```text
+medium response
+```
+
+Boss completion:
+
+```text
+large response
+```
+
+Victory:
+
+```text
+full cinematic response
+```
+
+Victory can include:
+
+* large-scale particle movement
+* logo animation
+* score emphasis
+* warm lighting
+* chocolate-themed effects
+* subtle camera movement
+* optional sound
+* celebratory typography
+
+But keep it elegant.
+
+The player should feel:
+
+> "I actually won something."
+
+not:
+
+> "The CSS exploded."
+
+---
+
+# 21. MICRO-ANIMATION BETWEEN EVERYTHING
+
+The game must avoid hard visual cuts wherever possible.
+
+Use seamless transitions for:
+
+* level selection → ready
+* ready → gameplay
+* question → question
+* answer → feedback
+* main game → boss
+* boss → results
+* results → victory
+
+Everything should feel like a continuous sequence.
+
+---
+
+# 22. CINEMATIC UI PRINCIPLE
+
+Use this hierarchy:
+
+```text
+GAMEPLAY
+   ↓
+READABILITY
+   ↓
+FEEDBACK
+   ↓
+ATMOSPHERE
+   ↓
+DECORATION
+```
+
+Never reverse that order.
+
+The player must always know what to do.
+
+Cinematic design is successful only when it improves the feeling of gameplay.
+
+---
+
+# 23. MOTION LANGUAGE
+
+Create a consistent animation language.
+
+Use a small number of carefully tuned motion families:
+
+### ENTER
+
+fade + scale + slight movement
+
+### EXIT
+
+fade + directional movement
+
+### IMPACT
+
+tiny scale/position response
+
+### SCORE
+
+number interpolation + directional movement
+
+### TRANSITION
+
+camera-like movement + opacity
+
+### CLIMAX
+
+larger environmental animation
+
+Do not invent a new animation style for every component.
+
+Consistency is what makes the application feel professionally designed.
+
+---
+
+# 24. REDUCED MOTION
+
+Respect:
+
+```css
+@media (prefers-reduced-motion: reduce)
+```
+
+When reduced motion is enabled:
+
+* remove large camera movement
+* reduce parallax
+* shorten transitions
+* remove unnecessary particles
+* preserve functional feedback
+
+The game must remain fully playable.
+
+---
+
+# 25. PERFORMANCE
+
+The cinematic effect must NOT require an expensive GPU.
+
+This is an exhibition project.
+
+Prioritize:
+
+* CSS transforms
+* opacity
+* SVG
+* lightweight Canvas where appropriate
+* requestAnimationFrame for custom animation
+* GPU-friendly compositing
+* limited particle counts
+* lazy-loaded assets
+* optimized textures
+* no unnecessary real-time 3D
+
+Avoid adding a full 3D game engine unless there is an actual reason.
+
+The game should remain smooth on ordinary school/exhibition hardware.
+
+---
+
+# 26. DO NOT OVERANIMATE
+
+This is a hard requirement.
+
+A cinematic interface needs moments of stillness.
+
+Use:
+
+```text
+motion
+→
+stillness
+→
+motion
+→
+stillness
+```
+
+not:
+
+```text
+motion
+motion
+motion
+motion
+motion
+```
+
+Stillness creates anticipation.
+
+The quiet pause before a boss reveal should be just as intentional as the boss animation itself.
+
+---
+
+# 27. DESIGN THE GAME LIKE A FILM EDITOR WOULD
+
+During implementation, think in terms of:
+
+* establishing shot
+* transition
+* reveal
+* reaction
+* escalation
+* pause
+* climax
+* resolution
+
+The browser is only the medium.
+
+The final experience should feel directed.
+
+---
+
+# 28. FINAL CINEMATIC TEST
+
+Before declaring the project complete, watch an entire run without interacting with it and ask:
+
+> Does this look like a sequence of animated scenes?
+
+Then play it yourself and ask:
+
+> Does the animation respond naturally to what I am doing?
+
+Then watch another person play it and ask:
+
+> Does the person watching understand what is happening?
+
+The final answer to all three should be yes.
+
+The target is not:
+
+> "This website has cool animations."
+
+The target is:
+
+> **"This feels like a little animated game."**
