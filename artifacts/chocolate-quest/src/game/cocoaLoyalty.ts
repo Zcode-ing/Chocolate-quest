@@ -29,6 +29,18 @@ export interface RunLoyaltyProgress {
   beansEarned: number;
 }
 
+export interface RunVerdict {
+  won: boolean;
+  answered: number;
+  attempts: number;
+  correct: number;
+  accuracy: number;
+  bossCorrect: number;
+  hasMinAnswered: boolean;
+  hasMinAccuracy: boolean;
+  hasMinBoss: boolean;
+}
+
 const INITIAL_PROFILE: CocoaLoyaltyProfile = {
   beans: 0,
   completedRuns: 0,
@@ -118,6 +130,38 @@ export function calculateRunLoyalty(
     accuracy,
     eligible,
     beansEarned,
+  };
+}
+
+export function evaluateRunVerdict(
+  records: AnswerRecord[],
+  stats?: { answered: number; correct: number; bossCorrect: number },
+): RunVerdict {
+  const attempts = records.length;
+  const answered =
+    stats?.answered ?? records.filter((record) => !record.skipped).length;
+  const correct =
+    stats?.correct ??
+    records.filter((record) => record.correct && !record.skipped).length;
+  const bossCorrect =
+    stats?.bossCorrect ??
+    records.filter((record) => record.boss && record.correct && !record.skipped).length;
+  const accuracy = attempts > 0 ? correct / attempts : 0;
+
+  const hasMinAnswered = answered >= GAME_CONFIG.winnerMinAnswered;
+  const hasMinAccuracy = accuracy >= GAME_CONFIG.winnerAccuracyThreshold;
+  const hasMinBoss = bossCorrect >= GAME_CONFIG.winnerMinBossCorrect;
+
+  return {
+    won: hasMinAnswered && hasMinAccuracy && hasMinBoss,
+    answered,
+    attempts,
+    correct,
+    accuracy,
+    bossCorrect,
+    hasMinAnswered,
+    hasMinAccuracy,
+    hasMinBoss,
   };
 }
 

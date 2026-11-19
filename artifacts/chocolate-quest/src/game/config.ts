@@ -28,6 +28,9 @@ export const GAME_CONFIG = {
   maxStreakMultiplier: 1.3,
   loyaltyMinimumAnswers: 6,
   loyaltyAccuracyThreshold: 0.7,
+  winnerMinAnswered: 6,
+  winnerAccuracyThreshold: 0.6,
+  winnerMinBossCorrect: 2,
 } as const;
 
 export const LEVEL_CONFIG: Record<

@@ -122,6 +122,7 @@ export interface GameState {
   roundKind: RoundKind;
   timerDeadline: number | null;
   questionStartedAt: number | null;
+  feedbackStartedAt: number | null;
   bossQuestions: GameQuestion[];
   questionHistory: GameQuestion[];
   answerHistory: AnswerRecord[];

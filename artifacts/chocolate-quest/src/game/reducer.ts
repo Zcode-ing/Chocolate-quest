@@ -1,5 +1,6 @@
 import { GAME_CONFIG, INITIAL_ABILITIES, LEVEL_CONFIG } from "./config";
 import { createInitialSkill, recordSkip, updateSkill } from "./difficulty";
+import { readSoundPreference, saveSoundPreference } from "./offlineDb";
 import { applyScoreBoundary, scoreAnswer } from "./scoring";
 import {
   chooseBossQuestions,
@@ -65,11 +66,12 @@ function createInitialState(): GameState {
     roundKind: null,
     timerDeadline: null,
     questionStartedAt: null,
+    feedbackStartedAt: null,
     bossQuestions: [],
     questionHistory: [],
     answerHistory: [],
     askedPromptKeys: [],
-    soundEnabled: false,
+    soundEnabled: readSoundPreference(true),
     randomSeed: 0x43a2_1f57,
     inputLockedUntil: 0,
   };
@@ -144,6 +146,7 @@ function enterBossIntro(state: GameState): GameState {
     phase: "boss-intro",
     currentQuestion: null,
     questionStartedAt: null,
+    feedbackStartedAt: null,
     feedback: null,
     roundKind: null,
     timerDeadline: null,
@@ -172,6 +175,7 @@ function startBoss(state: GameState, now: number): GameState {
         bossQuestionNumber: 1,
         timerDeadline: now + GAME_CONFIG.bossQuestionDurationMs,
         bossRemainingMs: GAME_CONFIG.bossQuestionDurationMs,
+        feedbackStartedAt: null,
       },
       question,
       now,
@@ -248,6 +252,7 @@ function resolveAnswer(
   return {
     ...state,
     phase: "feedback",
+    feedbackStartedAt: now,
     score: applyScoreBoundary(state.score + score.points),
     streak: nextStreak,
     bestStreak: Math.max(state.bestStreak, nextStreak),
@@ -273,6 +278,7 @@ function advanceAfterFeedback(state: GameState, now: number): GameState {
         roundKind: null,
         timerDeadline: null,
         questionStartedAt: null,
+        feedbackStartedAt: null,
         feedback: null,
         bossRemainingMs: 0,
       };
@@ -286,6 +292,7 @@ function advanceAfterFeedback(state: GameState, now: number): GameState {
         bossQuestionNumber: nextNumber,
         bossRemainingMs: GAME_CONFIG.bossQuestionDurationMs,
         timerDeadline: now + GAME_CONFIG.bossQuestionDurationMs,
+        feedbackStartedAt: null,
       },
       question,
       now,
@@ -293,7 +300,14 @@ function advanceAfterFeedback(state: GameState, now: number): GameState {
   }
 
   if (state.roundKind === "main") {
-    if (!state.timerDeadline || now >= state.timerDeadline) {
+    if (!state.timerDeadline) {
+      return enterBossIntro(state);
+    }
+    const pausedMs = state.feedbackStartedAt
+      ? Math.max(0, now - state.feedbackStartedAt)
+      : 0;
+    const shiftedDeadline = state.timerDeadline + pausedMs;
+    if (now >= shiftedDeadline) {
       return enterBossIntro(state);
     }
     return {
@@ -301,6 +315,9 @@ function advanceAfterFeedback(state: GameState, now: number): GameState {
       phase: "main",
       roundKind: "main",
       questionNumber: state.questionNumber + 1,
+      timerDeadline: shiftedDeadline,
+      remainingMs: Math.max(0, shiftedDeadline - now),
+      feedbackStartedAt: null,
     };
   }
   return state;
@@ -317,6 +334,7 @@ function startMainRound(state: GameState, now: number): GameState {
     bossRemainingMs: GAME_CONFIG.bossQuestionDurationMs,
     timerDeadline: now + GAME_CONFIG.mainRoundDurationMs,
     questionStartedAt: null,
+    feedbackStartedAt: null,
     feedback: null,
     score: 0,
     streak: 0,
@@ -351,6 +369,7 @@ function useAbility(
   if (!state.currentQuestion || state.abilities[ability] < 1) return state;
 
   if (ability === "shield") {
+    if (state.abilities.shieldArmed) return state;
     return {
       ...state,
       abilities: {
@@ -362,6 +381,7 @@ function useAbility(
   }
 
   if (ability === "fiftyFifty") {
+    if (state.abilities.eliminatedOptionIds.length > 0) return state;
     const incorrectOptions = state.currentQuestion.options.filter(
       (option) =>
         option.id !== state.currentQuestion?.correctOptionId &&
@@ -393,6 +413,9 @@ function useAbility(
   }
 
   const remaining = Math.max(0, (state.timerDeadline ?? now) - now);
+  if (remaining <= 0) {
+    return tick(state, now);
+  }
   const roundMaximum =
     state.phase === "boss"
       ? GAME_CONFIG.bossQuestionDurationMs + GAME_CONFIG.timeBurstMs
@@ -412,20 +435,14 @@ function useAbility(
 
 function tick(state: GameState, now: number): GameState {
   if (!state.timerDeadline) return state;
-  if (
-    state.roundKind === "main" &&
-    (state.phase === "main" || state.phase === "feedback")
-  ) {
+  if (state.roundKind === "main" && state.phase === "main") {
     const remainingMs = Math.max(0, state.timerDeadline - now);
-    if (remainingMs === 0 && state.phase === "main") return enterBossIntro(state);
+    if (remainingMs === 0) return enterBossIntro(state);
     return { ...state, remainingMs };
   }
-  if (
-    state.roundKind === "boss" &&
-    (state.phase === "boss" || state.phase === "feedback")
-  ) {
+  if (state.roundKind === "boss" && state.phase === "boss") {
     const bossRemainingMs = Math.max(0, state.timerDeadline - now);
-    if (bossRemainingMs === 0 && state.phase === "boss") {
+    if (bossRemainingMs === 0) {
       return resolveAnswer(state, null, now, true);
     }
     return { ...state, bossRemainingMs };
@@ -445,6 +462,7 @@ export function gameReducer(
         phase: "level-select",
         currentQuestion: null,
         feedback: null,
+        feedbackStartedAt: null,
         roundKind: null,
         timerDeadline: null,
       };
@@ -463,7 +481,7 @@ export function gameReducer(
         return advanceAfterFeedback(state, action.now);
       }
       return state;
-    case "ANSWER":
+    case "ANSWER": {
       if (
         (state.phase !== "main" && state.phase !== "boss") ||
         (state.phase === "main" && action.now < state.inputLockedUntil) ||
@@ -475,17 +493,12 @@ export function gameReducer(
       ) {
         return state;
       }
-      return resolveAnswer(state, action.optionId, action.now);
-    case "SKIP": {
-      if (state.phase === "boss" && state.currentQuestion) {
-        const skipped = resolveAnswer(state, null, action.now, false, true);
-        return {
-          ...skipped,
-          feedback: skipped.feedback
-            ? { ...skipped.feedback, label: "Boss question passed" }
-            : null,
-        };
+      if (state.timerDeadline && action.now >= state.timerDeadline) {
+        return tick(state, action.now);
       }
+      return resolveAnswer(state, action.optionId, action.now);
+    }
+    case "SKIP": {
       if (
         state.phase !== "main" ||
         action.now < state.inputLockedUntil ||
@@ -493,12 +506,16 @@ export function gameReducer(
       ) {
         return state;
       }
+      if (state.timerDeadline && action.now >= state.timerDeadline) {
+        return enterBossIntro(state);
+      }
       const skipped = resolveAnswer(state, null, action.now, false, true);
       return {
         ...pickMainQuestion(
           {
             ...skipped,
             phase: "main",
+            feedbackStartedAt: null,
             questionNumber: state.questionNumber + 1,
             inputLockedUntil: action.now + GAME_CONFIG.skipCooldownMs,
           },
@@ -514,8 +531,11 @@ export function gameReducer(
       return state.phase === "feedback"
         ? advanceAfterFeedback(state, action.now)
         : state;
-    case "TOGGLE_SOUND":
-      return { ...state, soundEnabled: !state.soundEnabled };
+    case "TOGGLE_SOUND": {
+      const next = !state.soundEnabled;
+      saveSoundPreference(next);
+      return { ...state, soundEnabled: next };
+    }
   }
 }
 

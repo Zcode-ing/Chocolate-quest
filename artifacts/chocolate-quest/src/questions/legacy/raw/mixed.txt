@@ -12,15 +12,15 @@ const mixedQuestions = [
     { question: "What is the force that causes objects to fall towards Earth?", options: ["Magnetism", "Gravity", "Friction", "Inertia"], answer: "Gravity" },
 
     // Math
-    { question: "What is 15 × 12?", options: ["180", "170", "150", "120"], answer: "180" },
+    { question: "What is 15 ï¿½ 12?", options: ["180", "170", "150", "120"], answer: "180" },
     { question: "Solve for x: 2x + 6 = 14", options: ["x = 3", "x = 4", "x = 5", "x = 7"], answer: "x = 4" },
     { question: "What is the square root of 81?", options: ["7", "8", "9", "10"], answer: "9" },
     { question: "What is the perimeter of a rectangle with length 6 cm and width 3 cm?", options: ["18 cm", "12 cm", "16 cm", "20 cm"], answer: "18 cm" },
     { question: "What is 20% of 150?", options: ["30", "40", "50", "60"], answer: "30" },
-    { question: "What is 45 ÷ 9?", options: ["5", "6", "7", "8"], answer: "5" },
+    { question: "What is 45 ï¿½ 9?", options: ["5", "6", "7", "8"], answer: "5" },
     { question: "What is the value of 2^5?", options: ["32", "16", "64", "128"], answer: "32" },
     { question: "If you buy 3 books for $12, how much will 5 books cost?", options: ["$18", "$20", "$22", "$24"], answer: "$20" },
-    { question: "What is the area of a triangle with base 10 cm and height 6 cm?", options: ["30 cm²", "20 cm²", "40 cm²", "50 cm²"], answer: "30 cm²" },
+    { question: "What is the area of a triangle with base 10 cm and height 6 cm?", options: ["30 cmï¿½", "20 cmï¿½", "40 cmï¿½", "50 cmï¿½"], answer: "30 cmï¿½" },
     { question: "What is the sum of 124 + 87?", options: ["211", "212", "210", "213"], answer: "211" },
 
     // Social Studies
@@ -52,11 +52,11 @@ const mixedQuestions = [
     { question: "What is the atomic number of carbon?", options: ["6", "8", "10", "12"], answer: "6" },
     { question: "Which organ in the human body produces insulin?", options: ["Liver", "Heart", "Pancreas", "Stomach"], answer: "Pancreas" },
     { question: "What is the largest organ in the human body?", options: ["Heart", "Liver", "Skin", "Lungs"], answer: "Skin" },
-    { question: "What is the formula for the area of a rectangle?", options: ["length × width", "2 × length × width", "length × length", "2 × length + width"], answer: "length × width" },
+    { question: "What is the formula for the area of a rectangle?", options: ["length ï¿½ width", "2 ï¿½ length ï¿½ width", "length ï¿½ length", "2 ï¿½ length + width"], answer: "length ï¿½ width" },
 
     // Math
-    { question: "What is 11 × 11?", options: ["121", "110", "100", "111"], answer: "121" },
-    { question: "What is the sum of the angles in a triangle?", options: ["180°", "360°", "90°", "270°"], answer: "180°" },
+    { question: "What is 11 ï¿½ 11?", options: ["121", "110", "100", "111"], answer: "121" },
+    { question: "What is the sum of the angles in a triangle?", options: ["180ï¿½", "360ï¿½", "90ï¿½", "270ï¿½"], answer: "180ï¿½" },
     { question: "What is the perimeter of a square with side length 7 cm?", options: ["28 cm", "25 cm", "30 cm", "35 cm"], answer: "28 cm" },
     { question: "Solve for y: 3y + 6 = 15", options: ["y = 3", "y = 4", "y = 5", "y = 2"], answer: "y = 3" },
     { question: "What is the value of p (pi) rounded to two decimal places?", options: ["3.14", "3.15", "3.16", "3.13"], answer: "3.14" },

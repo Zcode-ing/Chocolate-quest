@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowDownRight, ArrowLeft, ArrowRight, AudioLines, Award, Bolt, Check, ChevronRight,
   Clock3, Crown, Flame, Keyboard, Lightbulb, LockKeyhole, Play, RotateCcw,
   Shield, Sparkles, X, Zap,
 } from 'lucide-react';
 import { useGameController } from '@/game/useGameController';
-import { playSoundEnabledChime } from '@/game/sound';
 import { GAME_CONFIG } from '@/game/config';
 import { getCocoaStanding } from '@/game/cocoaLoyalty';
 import { useCocoaPlayers } from '@/game/cocoaPlayers';
@@ -13,6 +12,14 @@ import { PLAYABLE_QUESTIONS, QUESTION_IMPORT_DIAGNOSTICS, QUESTION_POOL_COUNTS }
 import { GameHeader } from '@/components/GameHeader';
 import { AnswerOption } from '@/components/AnswerOption';
 import { PreGameGate } from '@/components/PreGameGate';
+import {
+  ChocolateRewardSeal,
+  CinematicPrelude,
+  CinematicStage,
+  ScoreFlightLayer,
+  useAnimatedScore,
+  type ScoreDeltaBurst,
+} from '@/components/CinematicStage';
 
 type LevelId = 'junior' | 'semi-senior' | 'senior' | 'ultra-advanced';
 type AbilityId = 'shield' | 'fiftyFifty' | 'timeBurst';
@@ -25,6 +32,12 @@ const LEVELS: LevelInfo[] = [
   { id: 'ultra-advanced', title: 'Ultra Advanced', classes: 'B.Tech', note: 'For the beautifully brainy', mark: '04' },
 ];
 
+const BOSS_ACT_TITLES: Record<number, { act: string; subtitle: string }> = {
+  1: { act: 'ACT I', subtitle: 'THE OPENING GAMBIT' },
+  2: { act: 'ACT II', subtitle: 'THE ESCALATION' },
+  3: { act: 'ACT III', subtitle: 'FINAL RECKONING' },
+};
+
 function App() {
   const game = useGameController();
   const { state } = game;
@@ -34,14 +47,36 @@ function App() {
     state.level,
     state.answerHistory,
     state.skillState.estimatedSkill,
+    state.score,
+    state.stats.answered,
+    state.stats.bossCorrect,
   );
   const [showIntro, setShowIntro] = useState(false);
   const [showPlayerGate, setShowPlayerGate] = useState(false);
+  const [showPrelude, setShowPrelude] = useState(true);
+  const [scoreBursts, setScoreBursts] = useState<ScoreDeltaBurst[]>([]);
+  const burstCounterRef = useRef(0);
+
+  // Trigger floating score flight whenever feedback arrives
+  useEffect(() => {
+    if (state.phase !== 'feedback' || !state.feedback) return;
+    const id = ++burstCounterRef.current;
+    const nextBurst: ScoreDeltaBurst = {
+      id,
+      points: state.feedback.points,
+      correct: state.feedback.correct,
+      label: state.feedback.label || (state.feedback.correct ? 'Correct' : 'Missed'),
+    };
+    setScoreBursts((prev) => [...prev.slice(-3), nextBurst]);
+    const cleanup = window.setTimeout(() => {
+      setScoreBursts((prev) => prev.filter((item) => item.id !== id));
+    }, 1150);
+    return () => window.clearTimeout(cleanup);
+  }, [state.phase, state.feedback]);
 
   const flipSound = useCallback(() => {
-    if (!state.soundEnabled) playSoundEnabledChime();
     game.toggleSound();
-  }, [game.toggleSound, state.soundEnabled]);
+  }, [game.toggleSound]);
 
   const selectPlayer = useCallback((username: string) => {
     if (!loyalty.selectPlayer(username)) return;
@@ -78,6 +113,12 @@ function App() {
       if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
       const target = event.target as HTMLElement | null;
       if (target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '')) return;
+      if (showPrelude && !showPlayerGate && state.phase === 'intro' && (event.key === 'Escape' || event.key === ' ' || event.key === 'Enter')) {
+        event.preventDefault();
+        setShowPrelude(false);
+        return;
+      }
+      if (showPlayerGate || showIntro) return;
       if (/^[1-4]$/.test(event.key) && (state.phase === 'main' || state.phase === 'boss')) {
         const option = state.currentQuestion?.options[Number(event.key) - 1];
         if (option && !state.abilities.eliminatedOptionIds.includes(option.id)) chooseAnswer(option.id);
@@ -86,16 +127,17 @@ function App() {
         event.preventDefault();
         continueRound();
       }
-       if ((event.key.toLowerCase() === 's' || event.key === 'Escape') && state.phase === 'main') {
+      if ((event.key.toLowerCase() === 's' || event.key === 'Escape') && state.phase === 'main') {
         skipQuestion();
       }
-       if (event.key === 'Enter' && state.phase === 'level-select' && state.level) {
-         game.startRun(state.level as LevelId, loyalty.difficultyFor(state.level));
-       }
+      if (event.key === 'Enter' && state.phase === 'level-select' && state.level) {
+        event.preventDefault();
+        game.startRun(state.level as LevelId, loyalty.difficultyFor(state.level));
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [chooseAnswer, continueRound, game, loyalty.difficultyFor, skipQuestion, state.abilities.eliminatedOptionIds, state.currentQuestion, state.level, state.phase]);
+  }, [chooseAnswer, continueRound, game, loyalty.difficultyFor, showIntro, showPlayerGate, showPrelude, skipQuestion, state.abilities.eliminatedOptionIds, state.currentQuestion, state.level, state.phase]);
 
   const selectedLevel = LEVELS.find((level) => level.id === state.level);
   const isPlay = state.phase === 'main' || state.phase === 'boss' || state.phase === 'feedback';
@@ -105,7 +147,33 @@ function App() {
   const activeTimerTotalMs = isBoss
     ? GAME_CONFIG.bossQuestionDurationMs
     : GAME_CONFIG.mainRoundDurationMs;
+  const timerRatio = Math.max(0, Math.min(1, activeTimerMs / activeTimerTotalMs));
+  const timerState: 'calm' | 'warm' | 'critical' | 'urgent' =
+    !isPlay
+      ? 'calm'
+      : timerRatio <= 0.14
+        ? 'urgent'
+        : timerRatio <= 0.3
+          ? 'critical'
+          : timerRatio <= 0.55
+            ? 'warm'
+            : 'calm';
+
+  const streakTier =
+    state.streak >= 10
+      ? 5
+      : state.streak >= 8
+        ? 4
+        : state.streak >= 6
+          ? 3
+          : state.streak >= 4
+            ? 2
+            : state.streak >= 2
+              ? 1
+              : 0;
+
   const activeBossQuestion = Math.max(1, Math.min(3, state.bossQuestionNumber || 1));
+  const bossActInfo = BOSS_ACT_TITLES[activeBossQuestion] ?? BOSS_ACT_TITLES[1];
   const resultBeans = loyalty.activePlayer
     ? loyalty.activePlayer.beans +
       (loyalty.activePlayer.lastRunId === state.runId
@@ -113,9 +181,36 @@ function App() {
         : loyalty.runProgress.beansEarned)
     : 0;
   const resultStanding = loyalty.activePlayer ? getCocoaStanding(resultBeans) : null;
+  const verdict = loyalty.runVerdict;
+  const victoryIntensity: 'standard' | 'strong' | 'triumph' =
+    verdict.won && state.stats.bossCorrect === 3
+      ? 'triumph'
+      : verdict.won
+        ? 'strong'
+        : 'standard';
+  const animatedResultScore = useAnimatedScore(state.score, state.phase === 'result');
 
   return (
-    <main className="game-frame flex min-h-[100dvh] flex-col">
+    <main
+      className={`game-frame flex min-h-[100dvh] flex-col ${isBoss || state.phase === 'boss-intro' ? 'is-boss-world' : ''}`}
+      data-scene={showPlayerGate ? 'player-gate' : showIntro ? 'intro' : state.phase}
+      data-streak-tier={streakTier}
+      data-timer-state={timerState}
+      data-boss-act={isBoss ? activeBossQuestion : 0}
+      data-victory={state.phase === 'result' ? victoryIntensity : 'none'}
+    >
+      {showPrelude && !showPlayerGate && state.phase === 'intro' && (
+        <CinematicPrelude onFinish={() => setShowPrelude(false)} />
+      )}
+      <CinematicStage
+        phase={state.phase}
+        isBoss={isBoss}
+        bossAct={isBoss ? activeBossQuestion : 0}
+        streak={state.streak}
+        skill={state.skill}
+        timerRatio={timerRatio}
+        victoryIntensity={victoryIntensity}
+      />
       <GameHeader soundOn={state.soundEnabled} onToggleSound={flipSound} />
       <div className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-5 pb-8 sm:px-8 lg:px-12">
         {showPlayerGate && (
@@ -124,6 +219,8 @@ function App() {
             onSelectPlayer={selectPlayer}
             onExit={exitPlayerGate}
             onDifficultyChange={loyalty.setPlayerDifficulty}
+            onExportDatabase={loyalty.exportDatabase}
+            onImportDatabase={loyalty.importDatabase}
             questionCounts={QUESTION_POOL_COUNTS}
             totalQuestions={PLAYABLE_QUESTIONS.length}
             importedQuestionCount={QUESTION_IMPORT_DIAGNOSTICS.importedCount}
@@ -230,14 +327,41 @@ function App() {
         {isPlay && (
           <section className={`play-layout enter-up mx-auto flex w-full max-w-6xl flex-1 flex-col py-5 ${isBoss ? 'boss-mode' : ''}`}>
             <div className="play-topline">
-              <div className="play-level"><span className="live-mark" /> {isBoss ? 'BOSS ROUND' : 'QUICKFIRE ROUND'} <i /> {selectedLevel?.title ?? 'CHALLENGE'}</div>
-              <div className="score-display"><span>SCORE</span><strong data-testid="text-score">{state.score.toLocaleString()}</strong></div>
+              <div className="play-level">
+                <span className="live-mark" />{' '}
+                {isBoss ? `BOSS ROUND · ${bossActInfo.act} — ${bossActInfo.subtitle}` : 'QUICKFIRE ROUND'} <i /> {selectedLevel?.title ?? 'CHALLENGE'}
+              </div>
+              <div className="score-display relative">
+                <span>QUEST SCORE</span>
+                <strong data-testid="text-score">{state.score.toLocaleString()}</strong>
+                <ScoreFlightLayer bursts={scoreBursts} />
+              </div>
             </div>
-            <div className="timer-row">
+            <div className="timer-row" data-timer-urgency={timerState}>
               <div className="timer-clock"><Clock3 size={17} /><span className="mono">{`${Math.ceil(activeTimerMs / 1000).toString().padStart(2, '0')}s`}</span></div>
-              <div className="timer-track"><div className="timer-fill" style={{ transform: `scaleX(${Math.max(0, Math.min(1, activeTimerMs / activeTimerTotalMs))})` }} /></div>
-              <div className="streak-count"><Flame size={16} /><strong>{state.streak}</strong><span>STREAK</span></div>
+              <div className="timer-track"><div className="timer-fill" style={{ transform: `scaleX(${timerRatio})` }} /></div>
+              <div className={`streak-count ${streakTier > 0 ? 'is-streaking' : ''}`} data-streak-tier={streakTier}>
+                <Flame size={16} /><strong>{state.streak}</strong><span>{streakTier >= 3 ? `STREAK ×${state.streak}` : 'STREAK'}</span>
+              </div>
             </div>
+            {isBoss && (
+              <div className="boss-act-strip" aria-label={`Boss Act ${activeBossQuestion} of 3`}>
+                {[1, 2, 3].map((actNum) => {
+                  const status =
+                    actNum < activeBossQuestion
+                      ? 'done'
+                      : actNum === activeBossQuestion
+                        ? 'active'
+                        : 'upcoming';
+                  return (
+                    <div key={actNum} className={`boss-act-pill is-${status}`}>
+                      <span className="mono">{BOSS_ACT_TITLES[actNum].act}</span>
+                      <strong>{BOSS_ACT_TITLES[actNum].subtitle}</strong>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <div className="play-columns">
               <div className="question-column">
                 <div className="question-meta">
@@ -247,7 +371,7 @@ function App() {
                 </div>
                 <div
                   key={`${state.roundKind ?? 'run'}-${question?.id ?? 'loading'}-${isBoss ? activeBossQuestion : state.questionNumber}`}
-                  className="question-card"
+                  className={`question-card ${state.phase === 'feedback' && state.feedback ? (state.feedback.correct ? 'is-card-correct' : 'is-card-wrong') : ''}`}
                 >
                   {state.phase === 'feedback' && state.feedback && (
                     <div className={`feedback-ribbon ${state.feedback.correct ? 'feedback-good' : 'feedback-miss'}`} role="status" data-testid="status-answer-feedback">
@@ -291,12 +415,12 @@ function App() {
               </div>
               <aside className="tool-column">
                 <div className="skill-card">
-                  <div className="skill-title"><span>YOUR SKILL</span><Sparkles size={15} /></div>
+                  <div className="skill-title"><span>MOMENTUM INDEX</span><Sparkles size={15} /></div>
                   <div className="skill-score" aria-label={`Skill rating ${Math.round(state.skill)} out of 100`}>
                     {Math.round(state.skill)}<small> / 100</small>
                   </div>
                   <div className="skill-meter"><span style={{ transform: `scaleX(${Math.max(0, Math.min(1, state.skill / 100))})` }} /></div>
-                  <p>Keep your rhythm. Build that streak.</p>
+                  <p>{state.streak >= 4 ? 'The room is warming up. Hold your nerve.' : 'Keep your rhythm. Build that streak.'}</p>
                 </div>
                 <div className="ability-card">
                   <div className="ability-head"><span>POCKET POWERS</span><span>USE ONE</span></div>
@@ -315,12 +439,18 @@ function App() {
             <div className="boss-card">
               <div className="boss-seal"><Crown size={31} /></div>
               <div className="eyebrow justify-center"><span className="eyebrow-dot" /> THE LAST LITTLE HURDLE</div>
-              <h1 className="display-serif mt-5 text-6xl leading-[.94] tracking-[-.05em] sm:text-8xl">The boss<br /><span className="text-[#b88339]">is waiting.</span></h1>
-              <p className="mx-auto mt-5 max-w-md text-lg leading-7 text-[#705c4b]">Three questions. Each has its own 12-second clock. Give every one your best shot.</p>
+              <h1 className="display-serif mt-5 text-6xl leading-[.94] tracking-[-.05em] sm:text-8xl">The boss<br /><span className="text-[#d6a354]">is waiting.</span></h1>
+              <p className="mx-auto mt-5 max-w-md text-lg leading-7 text-[#c9b59c]">Three acts. Each has its own 12-second clock. Give every one your best shot.</p>
               <div className="boss-progress" aria-label="Three boss questions">
-                {[1, 2, 3].map((item) => <span key={item}><i>0{item}</i><b /></span>)}
+                {[1, 2, 3].map((item) => (
+                  <span key={item}>
+                    <i>0{item} · {BOSS_ACT_TITLES[item].act}</i>
+                    <small className="boss-progress-sub">{BOSS_ACT_TITLES[item].subtitle}</small>
+                    <b />
+                  </span>
+                ))}
               </div>
-              <button type="button" data-testid="button-enter-boss" onClick={game.startRound} className="primary-button mx-auto mt-9">
+              <button type="button" data-testid="button-enter-boss" onClick={game.startRound} className="primary-button boss-enter-btn mx-auto mt-9">
                 Meet the boss <ArrowRight size={17} /><span className="keycap">SPACE</span>
               </button>
             </div>
@@ -329,22 +459,45 @@ function App() {
 
         {state.phase === 'result' && (
           <section className="enter-up flex flex-1 items-center justify-center py-8">
-            <div className="result-panel w-full max-w-4xl">
+            <div className={`result-panel w-full max-w-4xl is-victory-${victoryIntensity}`}>
               <div className="result-top"><span className="eyebrow"><span className="eyebrow-dot" /> QUEST COMPLETE</span><span className="result-level">{selectedLevel?.title ?? 'CHOCOLATE QUEST'}</span></div>
               <div className="result-main">
                 <div>
-                  <p className="result-kicker">A very fine run.</p>
-                  <h1 className="display-serif result-score" data-testid="text-result-score">{state.score.toLocaleString()}<span>pts</span></h1>
-                  <p className="result-copy">You brought the brainpower. Take a bow, then go again.</p>
+                  <p className="result-kicker">
+                    {victoryIntensity === 'triumph'
+                      ? 'You won the game — boss sweep!'
+                      : victoryIntensity === 'strong'
+                        ? 'You won the game! Sharp instincts.'
+                        : 'So close — missed the winner mark.'}
+                  </p>
+                  <h1 className="display-serif result-score" data-testid="text-result-score" aria-label={`${state.score.toLocaleString()} points`}>
+                    {animatedResultScore.toLocaleString()}<span>pts</span>
+                  </h1>
+                  <p className="result-copy">
+                    {verdict.won
+                      ? 'You cleared the arena and beat the boss. Take a bow, then go again.'
+                      : 'Reach 60%+ accuracy, 6+ answers, and 2/3 boss questions to win the game.'}
+                  </p>
                 </div>
                 <div className="result-stats">
-                  <ResultStat label="Correct answers" value={`${state.stats.correct}`} icon={<Check size={17} />} />
-                  <ResultStat label="Best streak" value={`${state.stats.bestStreak}`} icon={<Flame size={17} />} />
-                  <ResultStat label="Boss answers" value={`${state.stats.bossCorrect} / 3`} icon={<Crown size={17} />} />
-                  <ResultStat label="Run accuracy" value={`${Math.round(loyalty.runProgress.accuracy * 100)}%`} icon={<Check size={17} />} />
-                  <ResultStat label="Average answer" value={`${state.stats.averageSeconds.toFixed(1)}s`} icon={<Clock3 size={17} />} />
+                  <ResultStat index={0} label="Correct answers" value={`${state.stats.correct}`} icon={<Check size={17} />} />
+                  <ResultStat index={1} label="Best streak" value={`${state.stats.bestStreak}`} icon={<Flame size={17} />} />
+                  <ResultStat index={2} label="Boss answers" value={`${state.stats.bossCorrect} / 3`} icon={<Crown size={17} />} />
+                  <ResultStat index={3} label="Run accuracy" value={`${Math.round(loyalty.runProgress.accuracy * 100)}%`} icon={<Check size={17} />} />
+                  <ResultStat index={4} label="Average answer" value={`${state.stats.averageSeconds.toFixed(1)}s`} icon={<Clock3 size={17} />} />
                 </div>
               </div>
+              <ChocolateRewardSeal
+                won={verdict.won}
+                hasMinAccuracy={verdict.hasMinAccuracy}
+                hasMinAnswered={verdict.hasMinAnswered}
+                hasMinBoss={verdict.hasMinBoss}
+                answered={verdict.answered}
+                eligible={loyalty.runProgress.eligible}
+                beansEarned={loyalty.runProgress.beansEarned}
+                bossCorrect={state.stats.bossCorrect}
+                accuracyPercent={Math.round(verdict.accuracy * 100)}
+              />
               {loyalty.activePlayer && resultStanding && <section className="cocoa-result" aria-labelledby="cocoa-result-title" data-testid="panel-cocoa-result">
                 <div className="cocoa-result-emblem"><Award size={21} /></div>
                 <div className="cocoa-result-copy">
@@ -392,8 +545,12 @@ function AbilityButton({ id, label, note, count, icon, onUse }: {
   </button>;
 }
 
-function ResultStat({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
-  return <div className="result-stat"><span className="result-stat-icon">{icon}</span><span>{label}</span><b>{value}</b></div>;
+function ResultStat({ label, value, icon, index = 0 }: { label: string; value: string; icon: ReactNode; index?: number }) {
+  return (
+    <div className="result-stat" style={{ animationDelay: `${220 + index * 95}ms` }}>
+      <span className="result-stat-icon">{icon}</span><span>{label}</span><b>{value}</b>
+    </div>
+  );
 }
 
 function CocoaEntryCard({ loyalty, compact = false }: {

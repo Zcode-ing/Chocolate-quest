@@ -1,14 +1,14 @@
-import { useMemo, useState, type CSSProperties, type FormEvent } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from 'react';
 import {
   ArrowLeft, ArrowRight, AudioLines, BadgeCheck, Bean, ChevronDown,
-  CircleHelp, Code2, Coins, Crown, LockKeyhole, ShieldCheck, X,
+  CircleHelp, Code2, Coins, Crown, Download, LockKeyhole, ShieldCheck, Upload, X,
 } from 'lucide-react';
-import { verifyDeveloperAccess } from '@workspace/api-client-react';
 import {
   normalizeUsername,
   validateUsername,
   type CocoaPlayerProfile,
 } from '@/game/cocoaPlayers';
+import { verifyLocalDeveloperCode } from '@/game/offlineDb';
 import type { AcademicLevel } from '@/game/types';
 import './pre-game-gate.css';
 
@@ -17,6 +17,8 @@ type PreGameGateProps = {
   onSelectPlayer: (username: string) => void;
   onExit: () => void;
   onDifficultyChange: (normalizedUsername: string, level: AcademicLevel, value: number) => void;
+  onExportDatabase?: () => string;
+  onImportDatabase?: (rawJson: string) => { ok: boolean; importedCount: number };
   questionCounts: Partial<Record<AcademicLevel, number>>;
   totalQuestions: number;
   importedQuestionCount: number;
@@ -45,6 +47,8 @@ export function PreGameGate({
   onSelectPlayer,
   onExit,
   onDifficultyChange,
+  onExportDatabase,
+  onImportDatabase,
   questionCounts,
   totalQuestions,
   importedQuestionCount,
@@ -57,6 +61,8 @@ export function PreGameGate({
   const [verifying, setVerifying] = useState(false);
   const [codeError, setCodeError] = useState('');
   const [developerReady, setDeveloperReady] = useState(false);
+  const [dbStatus, setDbStatus] = useState('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const matches = useMemo(() => {
     const query = normalizeUsername(username);
@@ -84,7 +90,7 @@ export function PreGameGate({
     onSelectPlayer(name);
   };
 
-  const submitCode = async (event: FormEvent<HTMLFormElement>) => {
+  const submitCode = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const submittedCode = accessCode;
     if (submittedCode.trim().length < 8 || verifying) return;
@@ -92,17 +98,47 @@ export function PreGameGate({
     setCodeError('');
     setAccessCode('');
     try {
-      const result = await verifyDeveloperAccess({ accessCode: submittedCode });
-      if (result.verified) {
+      const verified = verifyLocalDeveloperCode(submittedCode);
+      if (verified) {
         setDeveloperReady(true);
         setView('developer');
       } else {
         setCodeError('That code did not unlock developer access. Try again.');
       }
-    } catch {
-      setCodeError('Could not check the code right now. Please try again.');
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const handleExport = () => {
+    if (!onExportDatabase) return;
+    const payload = onExportDatabase();
+    const blob = new Blob([payload], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `chocolate-quest-db-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setDbStatus(`Exported ${players.length} local profile${players.length === 1 ? '' : 's'}.`);
+  };
+
+  const handleImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !onImportDatabase) return;
+    try {
+      const text = await file.text();
+      const result = onImportDatabase(text);
+      setDbStatus(
+        result.ok
+          ? `Restored ${result.importedCount} profile${result.importedCount === 1 ? '' : 's'} into offline DB.`
+          : 'Invalid backup file. Choose a Chocolate Quest JSON export.',
+      );
+    } catch {
+      setDbStatus('Could not read the selected backup file.');
     }
   };
 
@@ -110,6 +146,7 @@ export function PreGameGate({
     setView('players');
     setCodeError('');
     setAccessCode('');
+    setDbStatus('');
   };
 
   return (
@@ -265,10 +302,10 @@ export function PreGameGate({
                         {active && <div className="cq-gate__profile-detail" data-testid={`details-profile-${player.normalizedUsername}`}>
                           <div className="cq-gate__loyalty-line"><span><Coins size={14} /> Cocoa Loyalty</span><b>{player.beans} beans banked</b></div>
                           <div className="cq-gate__stats-grid">
-                            <div><span>COMPLETED RUNS</span><b>{player.completedRuns}</b></div>
+                            <div><span>WINS / RUNS</span><b>{player.wins} / {player.completedRuns}</b></div>
+                            <div><span>BEST SCORE</span><b>{player.bestScore.toLocaleString()} pts</b></div>
                             <div><span>BEST ACCURACY</span><b>{Math.round(player.bestAccuracy * 100)}%</b></div>
-                            <div><span>LAST RUN</span><b>{player.lastRunBeans} beans</b></div>
-                            <div><span>LAST ACCURACY</span><b>{Math.round(player.lastRunAccuracy * 100)}%</b></div>
+                            <div><span>LAST RUN</span><b>{player.lastRunWon === null ? `${player.lastRunBeans} beans` : `${player.lastRunWon ? 'Won' : 'Lost'} · ${player.lastRunBeans} beans`}</b></div>
                             <div><span>ANSWERS CORRECT</span><b>{player.totalCorrect} / {player.totalAnswers}</b></div>
                             <div><span>LAST LEVEL</span><b>{displayLevel(player.lastLevel)}</b></div>
                           </div>
@@ -309,11 +346,31 @@ export function PreGameGate({
           </div>
 
           <section className="cq-gate__diagnostics" aria-labelledby="cq-diagnostics-heading">
-            <div className="cq-gate__diag-heading"><span className="cq-gate__step">SYSTEM NOTES</span><h2 id="cq-diagnostics-heading">Diagnostics</h2></div>
+            <div className="cq-gate__diag-heading">
+              <div><span className="cq-gate__step">SYSTEM NOTES</span><h2 id="cq-diagnostics-heading">Offline Database & Diagnostics</h2></div>
+              {(onExportDatabase || onImportDatabase) && (
+                <div className="cq-gate__db-actions">
+                  {onExportDatabase && (
+                    <button type="button" className="cq-gate__db-btn" data-testid="button-export-db" onClick={handleExport}>
+                      <Download size={13} /> Export JSON
+                    </button>
+                  )}
+                  {onImportDatabase && (
+                    <>
+                      <button type="button" className="cq-gate__db-btn" data-testid="button-import-db" onClick={() => fileInputRef.current?.click()}>
+                        <Upload size={13} /> Import JSON
+                      </button>
+                      <input ref={fileInputRef} type="file" accept="application/json,.json" hidden onChange={handleImportFile} />
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            {dbStatus && <p className="cq-gate__db-status" role="status">{dbStatus}</p>}
             <div className="cq-gate__diag-grid">
-              <div className="cq-gate__diag-item"><div className="cq-gate__diag-icon"><ShieldCheck size={16} /></div><span>PROFILE STORAGE</span><b>Device-local only</b><small>Player data stays in this browser</small></div>
-              <div className="cq-gate__diag-item"><div className="cq-gate__diag-icon"><AudioLines size={16} /></div><span>SOUND</span><b data-testid="text-diagnostic-sound">{soundEnabled ? 'Enabled' : 'Muted'}</b><small>Current game setting</small></div>
-              <div className="cq-gate__diag-item cq-gate__question-counts"><div className="cq-gate__diag-icon"><CircleHelp size={16} /></div><span>TECH QUESTIONS</span><b data-testid="text-diagnostic-question-total">{totalQuestions} total <i>·</i> {importedQuestionCount} imported</b><small>{LEVELS.map((level) => `${level.title}: ${questionCounts[level.id] ?? 0}`).join('  /  ')}</small></div>
+              <div className="cq-gate__diag-item"><div className="cq-gate__diag-icon"><ShieldCheck size={16} /></div><span>OFFLINE STORAGE</span><b>LocalStorage + IndexedDB</b><small>Zero server or internet needed</small></div>
+              <div className="cq-gate__diag-item"><div className="cq-gate__diag-icon"><AudioLines size={16} /></div><span>SOUND & VOICE</span><b data-testid="text-diagnostic-sound">{soundEnabled ? 'Enabled' : 'Muted'}</b><small>Web Audio + offline speech</small></div>
+              <div className="cq-gate__diag-item cq-gate__question-counts"><div className="cq-gate__diag-icon"><CircleHelp size={16} /></div><span>LEVEL QUESTION SETS</span><b data-testid="text-diagnostic-question-total">{totalQuestions} unique <i>·</i> {importedQuestionCount} curated</b><small>{LEVELS.map((level) => `${level.title}: ${questionCounts[level.id] ?? 0}`).join('  /  ')}</small></div>
             </div>
           </section>
         </section>
