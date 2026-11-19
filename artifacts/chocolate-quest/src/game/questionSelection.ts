@@ -126,12 +126,18 @@ export function selectNextQuestion(input: {
     (question) =>
       !input.askedPromptKeys.includes(normalizePrompt(question.prompt)),
   );
+  const minPool = Math.min(GAME_CONFIG.questionPoolMinimum, uniqueQuestions.length);
+  const nonBossNotAsked = !input.boss
+    ? notAsked.filter((question) => !question.bossEligible)
+    : notAsked;
   const pool =
-    notAsked.length >= Math.min(GAME_CONFIG.questionPoolMinimum, uniqueQuestions.length)
-      ? notAsked
-      : notAsked.length > 0
+    nonBossNotAsked.length >= minPool
+      ? nonBossNotAsked
+      : notAsked.length >= minPool
         ? notAsked
-        : uniqueQuestions;
+        : notAsked.length > 0
+          ? notAsked
+          : uniqueQuestions;
 
   return chooseWeighted(pool, target, input.history, input.seed);
 }

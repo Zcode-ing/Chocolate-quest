@@ -1,6 +1,20 @@
 import { writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  NEW_JUNIOR_QUESTIONS,
+  NEW_SEMI_SENIOR_QUESTIONS,
+} from "./cbseQuestionsJuniorSemi.mjs";
+import {
+  NEW_SENIOR_QUESTIONS,
+  NEW_ULTRA_ADVANCED_QUESTIONS,
+} from "./cbseQuestionsSeniorUltra.mjs";
+import {
+  EXTRA_JUNIOR_25,
+  EXTRA_SEMI_SENIOR_25,
+  EXTRA_SENIOR_25,
+  EXTRA_ULTRA_ADVANCED_25,
+} from "./cbseQuestionsBatch740.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const outputPath = resolve(here, "curatedQuestions.generated.json");
@@ -297,9 +311,17 @@ const ULTRA_ADVANCED_QUESTIONS = [
 
 const ALL_RAW = [
   ...JUNIOR_QUESTIONS,
+  ...NEW_JUNIOR_QUESTIONS,
+  ...EXTRA_JUNIOR_25,
   ...SEMI_SENIOR_QUESTIONS,
+  ...NEW_SEMI_SENIOR_QUESTIONS,
+  ...EXTRA_SEMI_SENIOR_25,
   ...SENIOR_QUESTIONS,
+  ...NEW_SENIOR_QUESTIONS,
+  ...EXTRA_SENIOR_25,
   ...ULTRA_ADVANCED_QUESTIONS,
+  ...NEW_ULTRA_ADVANCED_QUESTIONS,
+  ...EXTRA_ULTRA_ADVANCED_25,
 ];
 
 function promptKey(prompt) {
@@ -309,6 +331,24 @@ function promptKey(prompt) {
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim()
     .replace(/\s+/g, " ");
+}
+
+const STOP_WORDS = new Set([
+  "which", "what", "when", "where", "why", "how", "who", "does", "do", "did",
+  "is", "are", "was", "were", "can", "could", "would", "should", "must",
+  "the", "a", "an", "in", "on", "at", "of", "for", "to", "from", "by", "with",
+  "into", "about", "across", "among", "between", "under", "over", "than",
+  "and", "or", "not", "only", "that", "this", "these", "those", "it", "its",
+  "one", "two", "using", "used", "use", "make", "makes", "called", "mean",
+  "means", "stand", "computer", "computers", "data", "system", "file", "files",
+]);
+
+function contentTokens(text) {
+  return new Set(
+    promptKey(text)
+      .split(" ")
+      .filter((tok) => tok.length > 1 && !STOP_WORDS.has(tok)),
+  );
 }
 
 function deriveEstimatedSeconds(prompt, options) {
@@ -373,11 +413,38 @@ const questions = ALL_RAW.map((item) => {
     calibrationStatus: "provisional",
     reviewFlags: [],
     eligibleForPlay: true,
-    bossEligible: item.bossEligible || idx > 45,
+    bossEligible: Boolean(item.bossEligible),
     tags: [item.level],
     originalAnswer: item.answer,
   };
 });
+
+const similarityWarnings = [];
+for (let i = 0; i < questions.length; i += 1) {
+  const a = questions[i];
+  const aTokens = contentTokens(a.prompt);
+  const aAns = promptKey(a.originalAnswer);
+  for (let j = i + 1; j < questions.length; j += 1) {
+    const b = questions[j];
+    const bTokens = contentTokens(b.prompt);
+    let shared = 0;
+    for (const t of aTokens) {
+      if (bTokens.has(t)) shared += 1;
+    }
+    const union = aTokens.size + bTokens.size - shared;
+    const jaccard = union > 0 ? shared / union : 0;
+    const bAns = promptKey(b.originalAnswer);
+    const sameAns = aAns === bAns && aAns.length > 2;
+    if (jaccard >= 0.55 || (sameAns && shared >= 2)) {
+      similarityWarnings.push({
+        a: `${a.id}: ${a.prompt} [${a.originalAnswer}]`,
+        b: `${b.id}: ${b.prompt} [${b.originalAnswer}]`,
+        jaccard: Number(jaccard.toFixed(2)),
+        sameAns,
+      });
+    }
+  }
+}
 
 const levelStats = {};
 for (const level of ["junior", "semi-senior", "senior", "ultra-advanced"]) {
@@ -407,12 +474,16 @@ for (const level of ["junior", "semi-senior", "senior", "ultra-advanced"]) {
   };
 }
 
+if (similarityWarnings.length > 0) {
+  console.warn("SIMILARITY WARNINGS:", JSON.stringify(similarityWarnings, null, 2));
+}
+
 const diagnostics = {
-  classificationStatus: "curated-level-separated-balanced",
+  classificationStatus: "curated-cbse-level-separated-balanced",
   importedCount: questions.length,
   sourceCounts: counters,
   excludedFromPlay: 0,
-  flaggedCount: 0,
+  flaggedCount: similarityWarnings.length,
   promptDuplicateGroups: 0,
   flaggedQuestions: [],
   levelStats,
@@ -426,4 +497,6 @@ await writeFile(
 
 console.log("Generated curated offline question database:", outputPath);
 console.log("Total questions:", questions.length);
+console.log("Similarity warnings:", similarityWarnings.length);
 console.log("Level audit:", JSON.stringify(levelStats, null, 2));
+

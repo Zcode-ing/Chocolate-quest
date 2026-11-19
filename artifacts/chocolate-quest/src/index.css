@@ -905,9 +905,77 @@ kbd { padding: 2px 5px; border: 1px solid rgba(93,64,42,.26); border-radius: 3px
   }
 }
 
+/* Grand Fullscreen Victory Confetti & Party Poppers */
+.cq-celebration-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 42;
+  pointer-events: none;
+  overflow: hidden;
+}
+.cq-confetti-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.cq-popper-cannon {
+  position: fixed;
+  bottom: 18px;
+  width: clamp(64px, 7vw, 88px);
+  height: clamp(64px, 7vw, 88px);
+  opacity: 0.92;
+  filter: drop-shadow(0 8px 18px rgba(45, 27, 19, 0.25));
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
+}
+.cq-popper-cannon--left {
+  left: clamp(14px, 2.6vw, 36px);
+  transform-origin: bottom left;
+}
+.cq-popper-cannon--right {
+  right: clamp(14px, 2.6vw, 36px);
+  transform-origin: bottom right;
+  transform: scaleX(-1);
+}
+.cq-popper-cannon--left.is-firing {
+  animation: cq-popper-kick-left 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.cq-popper-cannon--right.is-firing {
+  animation: cq-popper-kick-right 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.cq-popper-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+@keyframes cq-popper-kick-left {
+  0% { transform: scale(1) rotate(0deg); }
+  25% { transform: translate(-4px, 4px) scale(1.16) rotate(-10deg); }
+  65% { transform: translate(3px, -3px) scale(1.04) rotate(3deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+@keyframes cq-popper-kick-right {
+  0% { transform: scaleX(-1) rotate(0deg); }
+  25% { transform: scaleX(-1) translate(-4px, 4px) scale(1.16) rotate(-10deg); }
+  65% { transform: scaleX(-1) translate(3px, -3px) scale(1.04) rotate(3deg); }
+  100% { transform: scaleX(-1) rotate(0deg); }
+}
+
+.result-panel.is-victory-strong {
+  border-color: rgba(190, 134, 52, 0.44);
+  box-shadow: 0 22px 58px rgba(79, 52, 30, 0.14), inset 0 1px rgba(255, 255, 255, 0.72);
+}
 .result-panel.is-victory-triumph {
-  border-color: rgba(168, 116, 48, 0.42);
-  box-shadow: 0 20px 55px rgba(79, 52, 30, 0.12), inset 0 1px rgba(255, 255, 255, 0.65);
+  border-color: rgba(212, 154, 62, 0.62);
+  background:
+    radial-gradient(circle at 86% 10%, rgba(245, 202, 123, 0.22), transparent 44%),
+    radial-gradient(circle at 12% 18%, rgba(224, 174, 96, 0.16), transparent 48%),
+    rgba(251, 245, 232, 0.86);
+  box-shadow:
+    0 24px 68px rgba(79, 52, 30, 0.18),
+    0 0 0 1px rgba(229, 178, 92, 0.28),
+    inset 0 1px rgba(255, 255, 255, 0.85);
 }
 
 .cq-reward-moment {
@@ -928,10 +996,26 @@ kbd { padding: 2px 5px; border: 1px solid rgba(93,64,42,.26); border-radius: 3px
   overflow: hidden;
   animation: result-land 0.58s 0.18s var(--ease-cinema) both;
 }
+.cq-reward-moment.is-win {
+  border-color: rgba(236, 190, 108, 0.54);
+  background:
+    radial-gradient(circle at 14% 20%, rgba(246, 203, 122, 0.42), transparent 52%),
+    radial-gradient(circle at 88% 82%, rgba(224, 152, 68, 0.22), transparent 50%),
+    linear-gradient(135deg, rgba(72, 43, 29, 0.97), rgba(42, 24, 16, 0.99));
+  box-shadow:
+    0 16px 38px rgba(56, 34, 21, 0.24),
+    0 0 0 1px rgba(245, 202, 123, 0.2);
+}
+.cq-reward-moment.is-win.is-grand {
+  border-color: rgba(245, 202, 123, 0.72);
+  box-shadow:
+    0 18px 44px rgba(56, 34, 21, 0.28),
+    0 0 28px rgba(229, 178, 92, 0.22);
+}
 .cq-reward-moment__glow {
   position: absolute;
   inset: 0;
-  background: linear-gradient(115deg, transparent 20%, rgba(255, 232, 185, 0.14) 50%, transparent 78%);
+  background: linear-gradient(115deg, transparent 20%, rgba(255, 232, 185, 0.18) 50%, transparent 78%);
   transform: translateX(-100%);
   animation: question-sheen 1.4s 0.45s var(--ease-cinema) both;
   pointer-events: none;
@@ -942,9 +1026,9 @@ kbd { padding: 2px 5px; border: 1px solid rgba(93,64,42,.26); border-radius: 3px
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: radial-gradient(circle at 30% 30%, #e0b76f, #9e6b2b);
+  background: radial-gradient(circle at 30% 30%, #f1c97b, #9e6b2b);
   color: #2d1b13;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), 0 0 18px rgba(245, 202, 123, 0.3);
 }
 .cq-reward-moment__seal-ring {
   width: 38px;
@@ -964,7 +1048,7 @@ kbd { padding: 2px 5px; border: 1px solid rgba(93,64,42,.26); border-radius: 3px
 }
 .cq-reward-moment__title {
   margin: 4px 0 3px;
-  font-size: clamp(1.25rem, 2.4vw, 1.6rem);
+  font-size: clamp(1.25rem, 2.4vw, 1.65rem);
   line-height: 1.1;
   letter-spacing: -0.025em;
   color: #fff5e2;
@@ -974,6 +1058,12 @@ kbd { padding: 2px 5px; border: 1px solid rgba(93,64,42,.26); border-radius: 3px
   font-size: 12px;
   line-height: 1.45;
   color: #d7c2a3;
+}
+.cq-reward-moment__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
 }
 .cq-reward-moment__badge {
   padding: 7px 11px;
@@ -985,6 +1075,30 @@ kbd { padding: 2px 5px; border: 1px solid rgba(93,64,42,.26); border-radius: 3px
   letter-spacing: 0.14em;
   white-space: nowrap;
 }
+.cq-popper-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 11px;
+  border-radius: 4px;
+  border: 1px solid rgba(245, 202, 123, 0.52);
+  background: linear-gradient(135deg, rgba(245, 202, 123, 0.24), rgba(181, 121, 44, 0.3));
+  color: #fff3d6;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.cq-popper-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 224, 160, 0.78);
+  background: linear-gradient(135deg, rgba(245, 202, 123, 0.36), rgba(196, 134, 52, 0.42));
+}
+.cq-popper-btn:active {
+  transform: translateY(0) scale(0.97);
+}
 .cq-reward-moment.is-loss {
   border-color: rgba(164, 106, 86, 0.34);
   background:
@@ -994,6 +1108,7 @@ kbd { padding: 2px 5px; border: 1px solid rgba(93,64,42,.26); border-radius: 3px
 .cq-reward-moment.is-loss .cq-reward-moment__seal {
   background: radial-gradient(circle at 30% 30%, #c8907d, #7f4c3d);
   color: #fff3ea;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 .cq-reward-moment.is-loss .cq-reward-moment__eyebrow {
   color: #dfb09d;
@@ -1039,9 +1154,16 @@ kbd { padding: 2px 5px; border: 1px solid rgba(93,64,42,.26); border-radius: 3px
     grid-template-columns: 44px minmax(0, 1fr);
     padding: 15px;
   }
-  .cq-reward-moment__badge {
+  .cq-reward-moment__actions {
     grid-column: 1 / -1;
-    justify-self: start;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .cq-popper-cannon {
+    width: 54px;
+    height: 54px;
+    bottom: 10px;
   }
 }
 
@@ -1051,6 +1173,7 @@ kbd { padding: 2px 5px; border: 1px solid rgba(93,64,42,.26); border-radius: 3px
   .cq-contour-ring--inner,
   .cq-score-flight,
   .result-stat,
+  .cq-popper-cannon,
   .timer-row[data-timer-urgency="urgent"] .timer-clock {
     animation: none !important;
   }

@@ -8,6 +8,7 @@ import { useGameController } from '@/game/useGameController';
 import { GAME_CONFIG } from '@/game/config';
 import { getCocoaStanding } from '@/game/cocoaLoyalty';
 import { useCocoaPlayers } from '@/game/cocoaPlayers';
+import { playCelebrationBurstSound } from '@/game/sound';
 import { PLAYABLE_QUESTIONS, QUESTION_IMPORT_DIAGNOSTICS, QUESTION_POOL_COUNTS } from '@/questions/questionData';
 import { GameHeader } from '@/components/GameHeader';
 import { AnswerOption } from '@/components/AnswerOption';
@@ -17,6 +18,7 @@ import {
   CinematicPrelude,
   CinematicStage,
   ScoreFlightLayer,
+  VictoryCelebrationStage,
   useAnimatedScore,
   type ScoreDeltaBurst,
 } from '@/components/CinematicStage';
@@ -55,6 +57,7 @@ function App() {
   const [showPlayerGate, setShowPlayerGate] = useState(false);
   const [showPrelude, setShowPrelude] = useState(true);
   const [scoreBursts, setScoreBursts] = useState<ScoreDeltaBurst[]>([]);
+  const [confettiBurstKey, setConfettiBurstKey] = useState(0);
   const burstCounterRef = useRef(0);
 
   // Trigger floating score flight whenever feedback arrives
@@ -98,6 +101,13 @@ function App() {
   const chooseAnswer = useCallback((optionId: string) => {
     if (state.phase === 'main' || state.phase === 'boss') game.answer(optionId);
   }, [game, state.phase]);
+
+  const popVictoryConfetti = useCallback(() => {
+    setConfettiBurstKey((prev) => prev + 1);
+    if (state.soundEnabled) {
+      void playCelebrationBurstSound(state.stats.bossCorrect === 3);
+    }
+  }, [state.soundEnabled, state.stats.bossCorrect]);
 
   const continueRound = useCallback(() => {
     if (state.phase === 'ready') game.startRound();
@@ -210,6 +220,11 @@ function App() {
         skill={state.skill}
         timerRatio={timerRatio}
         victoryIntensity={victoryIntensity}
+      />
+      <VictoryCelebrationStage
+        active={state.phase === 'result' && verdict.won}
+        triumph={victoryIntensity === 'triumph'}
+        burstKey={confettiBurstKey}
       />
       <GameHeader soundOn={state.soundEnabled} onToggleSound={flipSound} />
       <div className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-5 pb-8 sm:px-8 lg:px-12">
@@ -497,6 +512,7 @@ function App() {
                 beansEarned={loyalty.runProgress.beansEarned}
                 bossCorrect={state.stats.bossCorrect}
                 accuracyPercent={Math.round(verdict.accuracy * 100)}
+                onCelebrate={popVictoryConfetti}
               />
               {loyalty.activePlayer && resultStanding && <section className="cocoa-result" aria-labelledby="cocoa-result-title" data-testid="panel-cocoa-result">
                 <div className="cocoa-result-emblem"><Award size={21} /></div>

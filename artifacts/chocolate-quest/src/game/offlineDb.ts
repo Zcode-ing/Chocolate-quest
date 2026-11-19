@@ -439,6 +439,43 @@ export function saveSoundPreference(enabled: boolean): void {
   }
 }
 
+const RECENT_PROMPTS_KEY = "chocolate-quest.recent-prompts.v1";
+const MAX_RECENT_PROMPTS_PER_LEVEL = 155;
+
+export function readRecentPromptKeys(level: AcademicLevel): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(RECENT_PROMPTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as Partial<Record<AcademicLevel, unknown>>;
+    const list = parsed?.[level];
+    if (!Array.isArray(list)) return [];
+    return list.filter((item): item is string => typeof item === "string");
+  } catch {
+    return [];
+  }
+}
+
+export function recordAskedPromptKey(
+  level: AcademicLevel,
+  promptKey: string,
+): void {
+  if (typeof window === "undefined" || !promptKey) return;
+  try {
+    const raw = window.localStorage.getItem(RECENT_PROMPTS_KEY);
+    const parsed: Partial<Record<AcademicLevel, string[]>> = raw
+      ? (JSON.parse(raw) as Partial<Record<AcademicLevel, string[]>>)
+      : {};
+    const current = Array.isArray(parsed[level]) ? parsed[level] : [];
+    const deduped = current.filter((item) => item !== promptKey);
+    deduped.push(promptKey);
+    parsed[level] = deduped.slice(-MAX_RECENT_PROMPTS_PER_LEVEL);
+    window.localStorage.setItem(RECENT_PROMPTS_KEY, JSON.stringify(parsed));
+  } catch {
+    // Ignore storage quota issues
+  }
+}
+
 /**
  * Pure-JS SHA-256 hex digest so developer code verification works 100% offline,
  * including over file:// where Web Crypto subtle may be unavailable.

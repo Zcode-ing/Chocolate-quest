@@ -1,6 +1,11 @@
 import { GAME_CONFIG, INITIAL_ABILITIES, LEVEL_CONFIG } from "./config";
 import { createInitialSkill, recordSkip, updateSkill } from "./difficulty";
-import { readSoundPreference, saveSoundPreference } from "./offlineDb";
+import {
+  readRecentPromptKeys,
+  readSoundPreference,
+  recordAskedPromptKey,
+  saveSoundPreference,
+} from "./offlineDb";
 import { applyScoreBoundary, scoreAnswer } from "./scoring";
 import {
   chooseBossQuestions,
@@ -95,6 +100,7 @@ function createReadyState(
     level,
     skill: skillState.estimatedSkill,
     skillState,
+    askedPromptKeys: readRecentPromptKeys(level),
     soundEnabled: previous.soundEnabled,
     randomSeed: seed || 0x43a2_1f57,
   };
@@ -106,6 +112,9 @@ function rememberQuestion(
   now: number,
 ): GameState {
   const promptKey = normalizePrompt(question.prompt);
+  if (state.level) {
+    recordAskedPromptKey(state.level, promptKey);
+  }
   return {
     ...state,
     currentQuestion: question,
@@ -113,7 +122,9 @@ function rememberQuestion(
     feedback: null,
     abilities: { ...state.abilities, eliminatedOptionIds: [] },
     questionHistory: [...state.questionHistory, question],
-    askedPromptKeys: [...state.askedPromptKeys, promptKey],
+    askedPromptKeys: state.askedPromptKeys.includes(promptKey)
+      ? state.askedPromptKeys
+      : [...state.askedPromptKeys, promptKey],
   };
 }
 
@@ -346,7 +357,7 @@ function startMainRound(state: GameState, now: number): GameState {
     bossQuestions: [],
     questionHistory: [],
     answerHistory: [],
-    askedPromptKeys: [],
+    askedPromptKeys: state.askedPromptKeys,
   };
   return pickMainQuestion(reset, now);
 }

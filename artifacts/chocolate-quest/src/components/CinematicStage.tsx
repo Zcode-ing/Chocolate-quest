@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Award, Crown, Sparkles } from 'lucide-react';
+import { Award, Crown, PartyPopper, Sparkles } from 'lucide-react';
 import type { GamePhase } from '@/game/types';
 
 export interface ScoreDeltaBurst {
@@ -336,6 +336,292 @@ export function useAnimatedScore(target: number, active: boolean, durationMs = 1
   return value;
 }
 
+interface ConfettiPiece {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  aspect: number;
+  rotation: number;
+  spin: number;
+  tilt: number;
+  tiltSpeed: number;
+  swayPhase: number;
+  swayFreq: number;
+  alpha: number;
+  decay: number;
+  shape: 'rect' | 'ribbon' | 'star';
+  color: string;
+}
+
+const CONFETTI_PALETTE = [
+  '#F5CA7B', // Metallic Gold
+  '#FFE9B8', // Warm Champagne
+  '#D98A3C', // Caramel Amber
+  '#E0565B', // Confection Berry
+  '#4EA86B', // Mint Emerald
+  '#FFFDF7', // Ivory Cream
+  '#A56734', // Milk Chocolate
+];
+
+/**
+ * Grand fullscreen confetti & twin party-popper cannon celebration overlay.
+ * Automatically fires choreographed salvos when active, and re-fires whenever burstKey increments.
+ */
+export function VictoryCelebrationStage({
+  active,
+  triumph,
+  burstKey,
+}: {
+  active: boolean;
+  triumph: boolean;
+  burstKey: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const particlesRef = useRef<ConfettiPiece[]>([]);
+  const [cannonPulse, setCannonPulse] = useState<'idle' | 'left' | 'right' | 'both'>('idle');
+
+  useEffect(() => {
+    if (!active) {
+      particlesRef.current = [];
+      setCannonPulse('idle');
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas || typeof window === 'undefined') return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      return;
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let width = (canvas.width = window.innerWidth);
+    let height = (canvas.height = window.innerHeight);
+
+    const onResize = () => {
+      if (!canvas) return;
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    };
+    window.addEventListener('resize', onResize, { passive: true });
+
+    const spawnCannon = (originX: number, originY: number, baseAngleDeg: number, count: number, powerMult = 1) => {
+      const cap = 140;
+      const list = particlesRef.current;
+      if (list.length > cap) {
+        list.splice(0, list.length - cap + count);
+      }
+
+      for (let i = 0; i < count; i += 1) {
+        const spread = (Math.random() - 0.5) * 46;
+        const rad = ((baseAngleDeg + spread) * Math.PI) / 180;
+        const speed = (9.5 + Math.random() * 11.5) * powerMult;
+        const roll = Math.random();
+        const shape: ConfettiPiece['shape'] =
+          roll < 0.2 ? 'star' : roll < 0.55 ? 'ribbon' : 'rect';
+
+        list.push({
+          x: originX + (Math.random() - 0.5) * 16,
+          y: originY + (Math.random() - 0.5) * 16,
+          vx: Math.cos(rad) * speed,
+          vy: Math.sin(rad) * speed,
+          size: shape === 'star' ? 6.5 + Math.random() * 4.5 : 7 + Math.random() * 7,
+          aspect: shape === 'ribbon' ? 2.4 + Math.random() * 1.4 : 0.55 + Math.random() * 0.45,
+          rotation: Math.random() * Math.PI * 2,
+          spin: (Math.random() - 0.5) * 0.2,
+          tilt: Math.random() * Math.PI * 2,
+          tiltSpeed: 0.08 + Math.random() * 0.14,
+          swayPhase: Math.random() * Math.PI * 2,
+          swayFreq: 0.04 + Math.random() * 0.04,
+          alpha: 0.96,
+          decay: 0.0022 + Math.random() * 0.0024,
+          shape,
+          color: CONFETTI_PALETTE[Math.floor(Math.random() * CONFETTI_PALETTE.length)],
+        });
+      }
+    };
+
+    const spawnZenithShower = (count: number) => {
+      const list = particlesRef.current;
+      for (let i = 0; i < count; i += 1) {
+        const shape: ConfettiPiece['shape'] = i % 5 === 0 ? 'star' : i % 2 === 0 ? 'ribbon' : 'rect';
+        list.push({
+          x: width * (0.12 + Math.random() * 0.76),
+          y: -16 - Math.random() * 50,
+          vx: (Math.random() - 0.5) * 3.4,
+          vy: 1.6 + Math.random() * 3.2,
+          size: shape === 'star' ? 6 + Math.random() * 4 : 7 + Math.random() * 6,
+          aspect: shape === 'ribbon' ? 2.6 : 0.65,
+          rotation: Math.random() * Math.PI * 2,
+          spin: (Math.random() - 0.5) * 0.14,
+          tilt: Math.random() * Math.PI * 2,
+          tiltSpeed: 0.07 + Math.random() * 0.1,
+          swayPhase: Math.random() * Math.PI * 2,
+          swayFreq: 0.035 + Math.random() * 0.03,
+          alpha: 0.94,
+          decay: 0.002 + Math.random() * 0.0018,
+          shape,
+          color: CONFETTI_PALETTE[Math.floor(Math.random() * CONFETTI_PALETTE.length)],
+        });
+      }
+    };
+
+    // Choreographed dual-popper launch + zenith confetti drop
+    const baseCount = triumph ? 44 : 34;
+    const timers: number[] = [];
+
+    setCannonPulse('left');
+    spawnCannon(Math.max(48, width * 0.06), height - 38, -56, baseCount, 1.05);
+
+    timers.push(
+      window.setTimeout(() => {
+        setCannonPulse('right');
+        spawnCannon(Math.min(width - 48, width * 0.94), height - 38, -124, baseCount, 1.05);
+      }, 170),
+    );
+
+    timers.push(
+      window.setTimeout(() => {
+        setCannonPulse('both');
+        spawnZenithShower(triumph ? 36 : 24);
+      }, 420),
+    );
+
+    if (triumph) {
+      timers.push(
+        window.setTimeout(() => {
+          spawnCannon(Math.max(48, width * 0.08), height - 42, -48, 22, 1.15);
+          spawnCannon(Math.min(width - 48, width * 0.92), height - 42, -132, 22, 1.15);
+        }, 880),
+      );
+    }
+
+    timers.push(
+      window.setTimeout(() => setCannonPulse('idle'), 1150),
+    );
+
+    let animId = 0;
+    const drawStar = (xSize: number) => {
+      ctx.beginPath();
+      for (let i = 0; i < 4; i += 1) {
+        const angle = (i * Math.PI) / 2;
+        const inner = angle + Math.PI / 4;
+        if (i === 0) ctx.moveTo(Math.cos(angle) * xSize, Math.sin(angle) * xSize);
+        else ctx.lineTo(Math.cos(angle) * xSize, Math.sin(angle) * xSize);
+        ctx.lineTo(Math.cos(inner) * (xSize * 0.36), Math.sin(inner) * (xSize * 0.36));
+      }
+      ctx.closePath();
+      ctx.fill();
+    };
+
+    const tick = () => {
+      ctx.clearRect(0, 0, width, height);
+      const list = particlesRef.current;
+
+      for (let i = list.length - 1; i >= 0; i -= 1) {
+        const p = list[i];
+        p.swayPhase += p.swayFreq;
+        p.vx = p.vx * 0.985 + Math.cos(p.swayPhase) * 0.09;
+        p.vy = p.vy * 0.988 + 0.19; // buoyant paper gravity
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rotation += p.spin;
+        p.tilt += p.tiltSpeed;
+        if (p.y > height * 0.55 || p.vy > 0) {
+          p.alpha -= p.decay;
+        }
+
+        if (p.alpha <= 0.02 || p.y > height + 40) {
+          list.splice(i, 1);
+          continue;
+        }
+
+        const scaleY = Math.max(0.18, Math.abs(Math.cos(p.tilt)));
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+        ctx.scale(1, scaleY);
+        ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha));
+        ctx.fillStyle = p.color;
+
+        if (p.shape === 'star') {
+          drawStar(p.size);
+        } else if (p.shape === 'ribbon') {
+          ctx.fillRect(-p.size * 0.9, -p.size * 0.24, p.size * 1.8, p.size * 0.48);
+        } else {
+          ctx.fillRect(-p.size * 0.5, (-p.size * p.aspect) / 2, p.size, p.size * p.aspect);
+        }
+        ctx.restore();
+      }
+
+      if (list.length > 0) {
+        animId = window.requestAnimationFrame(tick);
+      } else {
+        ctx.clearRect(0, 0, width, height);
+      }
+    };
+
+    animId = window.requestAnimationFrame(tick);
+
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.cancelAnimationFrame(animId);
+      for (const t of timers) window.clearTimeout(t);
+    };
+  }, [active, triumph, burstKey]);
+
+  if (!active) return null;
+
+  return (
+    <div className="cq-celebration-layer" aria-hidden="true" data-testid="victory-celebration-layer">
+      <canvas ref={canvasRef} className="cq-confetti-canvas" />
+      <div
+        className={`cq-popper-cannon cq-popper-cannon--left ${
+          cannonPulse === 'left' || cannonPulse === 'both' ? 'is-firing' : ''
+        }`}
+      >
+        <PartyPopperCannonSvg />
+      </div>
+      <div
+        className={`cq-popper-cannon cq-popper-cannon--right ${
+          cannonPulse === 'right' || cannonPulse === 'both' ? 'is-firing' : ''
+        }`}
+      >
+        <PartyPopperCannonSvg />
+      </div>
+    </div>
+  );
+}
+
+function PartyPopperCannonSvg() {
+  return (
+    <svg viewBox="0 0 88 88" className="cq-popper-svg" fill="none">
+      <defs>
+        <linearGradient id="cq-cone-gold" x1="14" y1="74" x2="54" y2="34" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#3B2216" />
+          <stop offset="50%" stopColor="#8E5B24" />
+          <stop offset="100%" stopColor="#F2C879" />
+        </linearGradient>
+      </defs>
+      {/* Confetti burst streaks out of cone mouth */}
+      <path d="M52 34 C60 22, 70 16, 80 12" stroke="#F5CA7B" strokeWidth="3" strokeLinecap="round" />
+      <path d="M56 42 C68 38, 76 34, 84 28" stroke="#E0565B" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M44 28 C46 16, 52 10, 62 6" stroke="#4EA86B" strokeWidth="2.5" strokeLinecap="round" />
+      <circle cx="72" cy="18" r="2.8" fill="#FFE9B8" />
+      <circle cx="80" cy="36" r="2.2" fill="#F5CA7B" />
+      <circle cx="58" cy="12" r="2.2" fill="#E0565B" />
+      {/* Party popper cone body */}
+      <path d="M14 74 L34 26 L62 54 Z" fill="url(#cq-cone-gold)" stroke="#FFE4B0" strokeWidth="1.5" />
+      <path d="M22 61 L48 39" stroke="#FFE9B8" strokeOpacity="0.6" strokeWidth="2.5" />
+      <path d="M28 46 L42 33" stroke="#2D1B13" strokeOpacity="0.55" strokeWidth="2.2" />
+      <ellipse cx="48" cy="40" rx="19" ry="7" transform="rotate(45 48 40)" fill="#2D1B13" stroke="#F5CA7B" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 /**
  * Victory / Loss verdict reveal on the result screen showing the 3 official win conditions.
  */
@@ -349,6 +635,7 @@ export function ChocolateRewardSeal({
   beansEarned,
   bossCorrect,
   accuracyPercent,
+  onCelebrate,
 }: {
   won: boolean;
   hasMinAccuracy: boolean;
@@ -359,17 +646,18 @@ export function ChocolateRewardSeal({
   beansEarned: number;
   bossCorrect: number;
   accuracyPercent: number;
+  onCelebrate?: () => void;
 }) {
   return (
     <div
-      className={`cq-reward-moment ${won ? 'is-win' : 'is-loss'}`}
+      className={`cq-reward-moment ${won ? 'is-win' : 'is-loss'} ${won && bossCorrect === 3 ? 'is-grand' : ''}`}
       data-testid="panel-chocolate-reward"
       data-verdict={won ? 'won' : 'lost'}
     >
       <div className="cq-reward-moment__glow" aria-hidden="true" />
       <div className="cq-reward-moment__seal" aria-hidden="true">
         <div className="cq-reward-moment__seal-ring">
-          {won ? (bossCorrect === 3 ? <Crown size={20} /> : <Award size={20} />) : <Sparkles size={20} />}
+          {won ? (bossCorrect === 3 ? <Crown size={22} /> : <Award size={22} />) : <Sparkles size={20} />}
         </div>
       </div>
       <div className="cq-reward-moment__body">
@@ -403,9 +691,23 @@ export function ChocolateRewardSeal({
           </span>
         </div>
       </div>
-      <div className="cq-reward-moment__badge mono">
-        <span>{won ? 'WINNER' : 'DEFEAT'}</span>
+      <div className="cq-reward-moment__actions">
+        <div className="cq-reward-moment__badge mono">
+          <span>{won ? 'WINNER' : 'DEFEAT'}</span>
+        </div>
+        {won && onCelebrate && (
+          <button
+            type="button"
+            className="cq-popper-btn"
+            data-testid="button-pop-confetti"
+            onClick={onCelebrate}
+          >
+            <PartyPopper size={14} />
+            <span>Pop confetti</span>
+          </button>
+        )}
       </div>
     </div>
   );
 }
+
